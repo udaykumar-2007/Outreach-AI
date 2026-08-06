@@ -158,6 +158,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) throw error;
       set({ session: data.session, user: data.user });
       await get().fetchProfile();
+      set({ isLoading: false });
       return true;
     } catch (err: any) {
       set({ error: err.message || 'Login failed', isLoading: false });
@@ -216,6 +217,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (data.session) {
         await get().fetchProfile();
       }
+      set({ isLoading: false });
       return true;
     } catch (err: any) {
       set({ error: err.message || 'Signup failed', isLoading: false });
