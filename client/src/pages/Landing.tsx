@@ -191,29 +191,40 @@ export const Landing: React.FC = () => {
         {introStep < 3 && (
           <motion.div 
             initial={{ opacity: 1 }}
-            exit={{ opacity: 0, filter: 'blur(10px)' }}
+            exit={{ opacity: 0, filter: 'blur(12px)', scale: 1.05 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
             className="fixed inset-0 z-50 bg-[#0B0F14] flex flex-col items-center justify-center overflow-hidden"
           >
+            {/* Background HUD Grid */}
             <div className="absolute inset-0 hud-grid opacity-[0.15] pointer-events-none" />
+
+            {/* Dual Volumetric Light Beams */}
+            <div className="absolute top-1/3 left-1/3 w-[450px] h-[450px] ambient-circle-1 pointer-events-none" />
+            <div className="absolute bottom-1/3 right-1/3 w-[450px] h-[450px] ambient-circle-2 pointer-events-none" />
 
             {/* Glowing Golden Light Assembly */}
             {introStep >= 1 && (
               <motion.div 
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8, ease: 'easeOut' }}
-                className="flex flex-col items-center gap-5 relative z-10"
+                initial={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
+                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="flex flex-col items-center gap-6 relative z-10 p-8 rounded-3xl hud-card border-[#EACEAA]/15 bg-[#34150F]/20 backdrop-blur-2xl max-w-sm w-full mx-4 shadow-2xl shadow-black/80"
               >
-                <div className="w-20 h-20 rounded-full border border-[#EACEAA]/30 flex items-center justify-center animate-pulse shadow-2xl shadow-amber-500/20">
-                  <div className="w-14 h-14 rounded-full border border-[#D39858]/40 flex items-center justify-center bg-[#EACEAA]/5">
-                    <span className="font-mono font-black text-sm text-[#EACEAA] tracking-widest">OA</span>
+                {/* Animated Dual Orbital Core */}
+                <div className="relative w-28 h-28 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border border-dashed border-[#EACEAA]/20 animate-spin" style={{ animationDuration: '12s' }} />
+                  <div className="absolute inset-1 rounded-full border-2 border-transparent border-t-[#EACEAA] border-r-[#D39858] animate-spin shadow-lg shadow-amber-500/20" style={{ animationDuration: '1.8s' }} />
+                  <div className="absolute inset-3 rounded-full border-2 border-transparent border-b-[#EACEAA] border-l-[#85431E] animate-spin" style={{ animationDuration: '2.5s', animationDirection: 'reverse' }} />
+
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#34150F] to-[#0B0F14] border border-[#EACEAA]/40 flex items-center justify-center shadow-xl shadow-amber-500/10 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[#EACEAA]/10 animate-pulse" />
+                    <span className="font-mono font-black text-sm text-[#EACEAA] tracking-widest relative z-10">OA</span>
                   </div>
                 </div>
 
-                <div className="text-center space-y-1">
-                  <h3 className="font-mono text-xs text-[#EACEAA] tracking-[0.25em] uppercase font-bold">BOOTSTRAPPING AI OS</h3>
-                  <span className="text-[10px] text-[#EACEAA]/60 font-mono font-bold uppercase tracking-wider block">OUTREACH AI / V1.0</span>
+                <div className="text-center space-y-1.5 font-mono">
+                  <h3 className="text-xs text-[#EACEAA] tracking-[0.25em] uppercase font-black text-white">BOOTSTRAPPING AI OS</h3>
+                  <span className="text-[10px] text-[#EACEAA]/70 uppercase tracking-widest font-bold block">OUTREACH AI / V1.0</span>
                 </div>
               </motion.div>
             )}
