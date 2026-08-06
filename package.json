@@ -6,7 +6,9 @@
     "install:all": "npm install && npm install --prefix server && npm install --prefix workers && npm install --prefix client",
     "dev": "concurrently --kill-others \"npm run dev --prefix server\" \"npm run dev --prefix workers\" \"npm run dev --prefix client\"",
     "build:all": "npm run build --prefix server && npm run build --prefix workers && npm run build --prefix client",
-    "build": "npm run install:all && npm run build:all"
+    "build": "npm run install:all && npm run build:all",
+    "start": "node server/dist/index.js",
+    "start:worker": "node workers/dist/index.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
