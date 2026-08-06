@@ -5,6 +5,7 @@ import { publishLog } from '../services/publisher.js';
 import { z } from 'zod';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -31,6 +32,44 @@ const autopostOutputSchema = z.object({
   devto_markdown: z.string(),
   tweet_content: z.string().max(280),
 });
+
+// OAuth 1.0a User Context Header Builder for Twitter V2 API
+function getTwitterOAuthHeader(
+  method: string,
+  url: string,
+  consumerKey: string,
+  consumerSecret: string,
+  accessToken: string,
+  accessTokenSecret: string
+): string {
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: consumerKey,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: accessToken,
+    oauth_version: '1.0',
+  };
+
+  const sortedParams = Object.keys(oauthParams)
+    .sort()
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
+    .join('&');
+
+  const baseString = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(sortedParams)}`;
+  const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(accessTokenSecret)}`;
+  const signature = crypto
+    .createHmac('sha1', signingKey)
+    .update(baseString)
+    .digest('base64');
+
+  oauthParams.oauth_signature = signature;
+
+  return 'OAuth ' + Object.keys(oauthParams)
+    .sort()
+    .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+    .join(', ');
+}
 
 export const autopostWorker = new Worker<AutopostJobData>(
   'autopost-queue',
@@ -162,16 +201,53 @@ I would love to connect and hear your feedback!
         console.error('[AutopostWorker] Dev.to request error:', err);
         await publishLog(userId, 'WARNING', { message: 'Network error connecting to Dev.to API.' });
       }
+    } else {
+      await publishLog(userId, 'INFO', { message: 'Dev.to API key not provided. Skipping Dev.to publication.' });
     }
 
     // 2. Publish to Twitter/X
     if (hasTwitter) {
       await publishLog(userId, 'INFO', { message: 'Publishing announcement to Twitter/X...' });
-      // Simulate/Queued announcement because standard write access needs full OAuth 1.0a flow
-      await sleep(1000);
-      await publishLog(userId, 'INFO', {
-        message: `🐦 [Twitter/X Post Simulated] Tweeted: "${generated.tweet_content}"`,
-      });
+      const twitterUrl = 'https://api.twitter.com/2/tweets';
+      const oauthHeader = getTwitterOAuthHeader(
+        'POST',
+        twitterUrl,
+        keys.twitter_api_key,
+        keys.twitter_api_secret,
+        keys.twitter_access_token,
+        keys.twitter_access_secret
+      );
+
+      try {
+        const twitterRes = await fetch(twitterUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': oauthHeader,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: generated.tweet_content,
+          }),
+        });
+
+        if (twitterRes.ok) {
+          const data: any = await twitterRes.json();
+          await publishLog(userId, 'INFO', {
+            message: `🐦 Successfully posted announcement to Twitter/X! Tweet ID: ${data.data?.id}`,
+          });
+        } else {
+          const errText = await twitterRes.text();
+          console.error('[AutopostWorker] Twitter publish failed:', errText);
+          await publishLog(userId, 'WARNING', {
+            message: `Failed to post to Twitter/X (Status: ${twitterRes.status}). Verify your developer credentials.`,
+          });
+        }
+      } catch (err: any) {
+        console.error('[AutopostWorker] Twitter request error:', err);
+        await publishLog(userId, 'WARNING', { message: 'Network error connecting to Twitter/X API.' });
+      }
+    } else {
+      await publishLog(userId, 'INFO', { message: 'Twitter API credentials not provided. Skipping Twitter/X publication.' });
     }
 
     await publishLog(userId, 'PORTFOLIO_GENERATED', {
