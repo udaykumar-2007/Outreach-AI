@@ -35,6 +35,7 @@ export const Settings: React.FC = () => {
   const [activeLinkedIn, setActiveLinkedIn] = useState(true);
   const [activeTwitter, setActiveTwitter] = useState(true);
   const [activeUpwork, setActiveUpwork] = useState(true);
+  const [activeDevto, setActiveDevto] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -49,10 +50,11 @@ export const Settings: React.FC = () => {
       setRole(profile.role || 'student');
       setIsBusy(profile.is_busy || false);
 
-      const platforms = profile.active_platforms || { linkedin: true, twitter: true, upwork: true };
+      const platforms = (profile.active_platforms as any) || { linkedin: true, twitter: true, upwork: true, devto: true };
       setActiveLinkedIn(platforms.linkedin !== false);
       setActiveTwitter(platforms.twitter !== false);
       setActiveUpwork(platforms.upwork !== false);
+      setActiveDevto(platforms.devto !== false);
 
       const keys = (profile as any).api_keys || {};
       setLinkedinLiAt(keys.linkedin_li_at || '');
@@ -108,6 +110,7 @@ export const Settings: React.FC = () => {
         linkedin: activeLinkedIn,
         twitter: activeTwitter,
         upwork: activeUpwork,
+        devto: activeDevto,
       },
       api_keys: {
         linkedin_li_at: linkedinLiAt || null,
@@ -135,6 +138,7 @@ export const Settings: React.FC = () => {
         if (activeLinkedIn) activePlatforms.push('linkedin');
         if (activeTwitter) activePlatforms.push('twitter');
         if (activeUpwork) activePlatforms.push('upwork');
+        if (activeDevto) activePlatforms.push('devto');
 
         // Create campaign for each active platform
         for (const plat of activePlatforms) {
@@ -334,6 +338,16 @@ export const Settings: React.FC = () => {
                       className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-800"
                     />
                     <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Upwork search bids</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-850 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={activeDevto}
+                      onChange={(e) => setActiveDevto(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-800"
+                    />
+                    <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Dev.to article author crawler</span>
                   </label>
                 </div>
               </div>

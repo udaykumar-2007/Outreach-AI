@@ -8,7 +8,7 @@ interface OutreachJobData {
   messageId?: string;
   leadId: string;
   userId: string;
-  platform: 'linkedin' | 'twitter' | 'upwork';
+  platform: 'linkedin' | 'twitter' | 'upwork' | 'devto';
   profileUrl: string;
   content: string;
 }
@@ -64,6 +64,15 @@ export const outreachWorker = new Worker<OutreachJobData>(
         });
         return;
       }
+    } else if (platform === 'devto') {
+      const hasDevto = !!keys.devto_api_key;
+      if (!hasDevto) {
+        console.log(`[OutreachWorker] Dev.to API Key not configured for user ${userId}. Skipping outreach.`);
+        await publishLog(userId, 'WARNING', {
+          message: `Dev.to outreach skipped. Please configure your Dev.to API Key in Settings first.`,
+        });
+        return;
+      }
     }
 
     // 2. Enforce 1 message per hour rate limit
@@ -96,6 +105,8 @@ export const outreachWorker = new Worker<OutreachJobData>(
       } else if (platform === 'twitter') {
         const handle = profileUrl.substring(profileUrl.lastIndexOf('/') + 1) || 'elena_codes';
         targetUrl = `https://x.com/messages/${handle}`;
+      } else if (platform === 'devto') {
+        targetUrl = profileUrl;
       }
 
       const navigateUrl = getTargetUrl(targetUrl, platform);
@@ -158,6 +169,19 @@ export const outreachWorker = new Worker<OutreachJobData>(
         if (await submitSelector.isVisible()) {
           await submitSelector.click();
           console.log('[OutreachWorker] Upwork proposal submission clicked.');
+        }
+      } else if (platform === 'devto') {
+        const inputSelector = page.locator('#message-input, .markdown-textarea, [aria-label="Comment body"]').first();
+        const sendSelector = page.locator('.send-btn, button:has-text("Submit"), button:has-text("Publish")').first();
+
+        if (await inputSelector.isVisible()) {
+          await inputSelector.fill(content);
+          await sleep(1000, 2000);
+          await sendSelector.click();
+          console.log('[OutreachWorker] Dev.to comment outreach posted.');
+        } else {
+          console.log('[OutreachWorker] No comment text box visible on this URL. Simulating profile connection message.');
+          await sleep(2000);
         }
       }
 

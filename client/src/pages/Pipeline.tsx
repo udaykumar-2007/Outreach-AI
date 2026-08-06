@@ -11,7 +11,7 @@ import {
 interface Lead {
   id: string;
   name: string;
-  platform: 'linkedin' | 'twitter' | 'upwork';
+  platform: 'linkedin' | 'twitter' | 'upwork' | 'devto';
   profile_url: string;
   company: string;
   match_score: number;
@@ -160,10 +160,11 @@ export const Pipeline: React.FC = () => {
                           <h5 className="font-bold text-sm text-slate-200 truncate">{lead.name}</h5>
                           <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 border ${
                             lead.platform === 'linkedin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                            lead.platform === 'twitter' ? 'bg-slate-800 text-slate-400 border-slate-700' :
+                            lead.platform === 'twitter' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                            lead.platform === 'devto' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                             'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                           }`}>
-                            {lead.platform}
+                            {lead.platform === 'devto' ? 'dev.to' : lead.platform}
                           </span>
                         </div>
 
@@ -281,6 +282,16 @@ function getMockPipelineLeads(platform: string): Lead[] {
       match_score: 80,
       status: 'converted',
       reason: 'Contract signed! Freelancer client landed.',
+    },
+    {
+      id: 'l6',
+      name: 'Rohan Sharma',
+      platform: 'devto',
+      profile_url: 'https://dev.to/rohan_codes',
+      company: 'Senior Software Engineer (Writing about React)',
+      match_score: 89,
+      status: 'discovered',
+      reason: 'Regularly posts high-quality React guides. High outreach match.',
     },
   ];
 

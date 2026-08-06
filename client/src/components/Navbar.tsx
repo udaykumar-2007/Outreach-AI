@@ -47,7 +47,7 @@ export const Navbar: React.FC = () => {
       <div className="flex items-center gap-4">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest hidden sm:inline">Platform Filter</span>
         <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex gap-1">
-          {(['all', 'linkedin', 'twitter', 'upwork'] as const).map((p) => (
+          {(['all', 'linkedin', 'twitter', 'upwork', 'devto'] as const).map((p) => (
             <button
               key={p}
               onClick={() => setPlatform(p)}
@@ -57,7 +57,7 @@ export const Navbar: React.FC = () => {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {p}
+              {p === 'devto' ? 'dev.to' : p}
             </button>
           ))}
         </div>

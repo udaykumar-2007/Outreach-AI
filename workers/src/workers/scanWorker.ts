@@ -9,7 +9,7 @@ import { outreachQueue } from '../queues.js';
 interface ScanJobData {
   campaignId: string;
   userId: string;
-  platform: 'linkedin' | 'twitter' | 'upwork';
+  platform: 'linkedin' | 'twitter' | 'upwork' | 'devto';
   targetKeywords: string[];
   targetRole: string;
 }
@@ -74,6 +74,19 @@ export const scanWorker = new Worker<ScanJobData>(
         });
         return;
       }
+    } else if (platform === 'devto') {
+      const hasDevto = !!keys.devto_api_key;
+      if (!hasDevto) {
+        console.log(`[ScanWorker] Dev.to API Key not configured for user ${userId}. Pausing campaign.`);
+        await supabaseAdmin
+          .from('campaigns')
+          .update({ active: false })
+          .eq('id', campaignId);
+        await publishLog(userId, 'WARNING', {
+          message: `Dev.to campaign paused. Please configure your Dev.to API Key in Settings first.`,
+        });
+        return;
+      }
     }
 
     const { context, page, browser, statePath } = await getBrowserSession(userId, platform);
@@ -89,6 +102,8 @@ export const scanWorker = new Worker<ScanJobData>(
         searchUrl = `https://x.com/search?q=${encodeURIComponent(keyword)}&f=user`;
       } else if (platform === 'upwork') {
         searchUrl = `https://www.upwork.com/nx/search/jobs/?q=${encodeURIComponent(keyword)}`;
+      } else if (platform === 'devto') {
+        searchUrl = `https://dev.to/search?q=${encodeURIComponent(keyword)}`;
       }
 
       const targetUrl = getTargetUrl(searchUrl, platform);
@@ -148,6 +163,29 @@ export const scanWorker = new Worker<ScanJobData>(
             profileUrl,
             company: 'Upwork Project',
           });
+        }
+      } else if (platform === 'devto') {
+        const items = page.locator('.crayons-story__meta');
+        const count = await items.count();
+        console.log(`[ScanWorker] Found ${count} story metadata items on Dev.to search page.`);
+        for (let i = 0; i < count; i++) {
+          const item = items.nth(i);
+          const authorLink = item.locator('a').first();
+          try {
+            const authorText = (await authorLink.innerText({ timeout: 1500 })).trim();
+            const authorHref = await authorLink.getAttribute('href', { timeout: 1500 });
+            if (authorText && authorHref) {
+              const profileUrl = authorHref.startsWith('http') ? authorHref : `https://dev.to${authorHref}`;
+              discoveredLeads.push({
+                name: authorText,
+                profileUrl,
+                headline: 'Technical Writer on Dev.to',
+                company: 'DEV Community',
+              });
+            }
+          } catch (itemErr) {
+            // Ignore if sub-elements timeout or selector differs
+          }
         }
       }
 

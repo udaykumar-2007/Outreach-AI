@@ -2,10 +2,10 @@ import { create } from 'zustand';
 
 interface FilterState {
   persona: 'student' | 'freelancer';
-  platform: 'all' | 'linkedin' | 'twitter' | 'upwork';
+  platform: 'all' | 'linkedin' | 'twitter' | 'upwork' | 'devto';
   automationActive: boolean;
   setPersona: (persona: 'student' | 'freelancer') => void;
-  setPlatform: (platform: 'all' | 'linkedin' | 'twitter' | 'upwork') => void;
+  setPlatform: (platform: 'all' | 'linkedin' | 'twitter' | 'upwork' | 'devto') => void;
   setAutomationActive: (active: boolean) => void;
 }
 

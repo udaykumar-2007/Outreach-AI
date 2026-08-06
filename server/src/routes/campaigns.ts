@@ -7,7 +7,7 @@ import { z } from 'zod';
 const router = Router();
 
 const campaignSchema = z.object({
-  platform: z.enum(['linkedin', 'twitter', 'upwork']),
+  platform: z.enum(['linkedin', 'twitter', 'upwork', 'devto']),
   target_keywords: z.array(z.string()).min(1, 'At least one keyword is required'),
   target_role: z.string().min(2, 'Target role is required'),
   active: z.boolean().optional(),
