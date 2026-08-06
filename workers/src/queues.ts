@@ -9,4 +9,7 @@ export const redisConnection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
+import { Queue } from 'bullmq';
+export const outreachQueue = new Queue('outreach-queue', { connection: redisConnection });
+
 console.log('Worker Redis connection established with:', redisUrl);

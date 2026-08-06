@@ -1,14 +1,14 @@
 import { chromium, BrowserContext, Page } from 'playwright';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const SESSIONS_DIR = path.join(__dirname, '../../storage/sessions');
+// Safe CommonJS path resolution without import.meta
+const SESSIONS_DIR = typeof __dirname !== 'undefined'
+  ? path.join(__dirname, '../../storage/sessions')
+  : path.join(process.cwd(), 'storage/sessions');
 
 // Ensure session persistence directories exist
 if (!fs.existsSync(SESSIONS_DIR)) {
