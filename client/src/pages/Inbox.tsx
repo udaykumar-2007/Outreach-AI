@@ -42,7 +42,6 @@ export const Inbox: React.FC = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Fetch interested leads (Human hand-off list)
   const fetchLeads = async () => {
     if (!session) return;
     try {
@@ -54,35 +53,20 @@ export const Inbox: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         setLeads(data);
+        if (data.length > 0 && !selectedLead) {
+          setSelectedLead(data[0]);
+        }
       } else {
-        // Fallback mock leads
-        setLeads(getMockInterestedLeads(globalPlatform));
+        const mockData = getMockLeads();
+        setLeads(mockData);
+        if (!selectedLead) setSelectedLead(mockData[0]);
       }
-    } catch (e) {
-      setLeads(getMockInterestedLeads(globalPlatform));
+    } catch (err) {
+      const mockData = getMockLeads();
+      setLeads(mockData);
+      if (!selectedLead) setSelectedLead(mockData[0]);
     } finally {
       setLoadingLeads(false);
-    }
-  };
-
-  // Fetch messages for active lead
-  const fetchMessages = async (leadId: string) => {
-    if (!session) return;
-    setLoadingMessages(true);
-    try {
-      const res = await fetch(`http://localhost:5000/api/leads/${leadId}/messages`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data);
-      } else {
-        setMessages(getMockMessages(leadId));
-      }
-    } catch (e) {
-      setMessages(getMockMessages(leadId));
-    } finally {
-      setLoadingMessages(false);
     }
   };
 
@@ -91,45 +75,51 @@ export const Inbox: React.FC = () => {
   }, [session, globalPlatform]);
 
   useEffect(() => {
-    if (selectedLead) {
-      fetchMessages(selectedLead.id);
-    }
-  }, [selectedLead]);
-
-  // Listen for real-time messages coming from WebSocket
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('MESSAGE_RECEIVED', (data: { message: Message; leadId: string }) => {
-      if (selectedLead && data.leadId === selectedLead.id) {
-        setMessages(prev => [...prev, data.message]);
-      }
-      fetchLeads(); // Refresh list to update badge/last message
-    });
-
-    socket.on('MESSAGE_SENT', (data: { message: Message; leadId: string }) => {
-      if (selectedLead && data.leadId === selectedLead.id) {
-        // Avoid duplicate message inserts
-        setMessages(prev => {
-          if (prev.find(m => m.id === data.message.id)) return prev;
-          return [...prev, data.message];
+    const fetchMessages = async () => {
+      if (!selectedLead || !session) return;
+      setLoadingMessages(true);
+      try {
+        const res = await fetch(`http://localhost:5000/api/leads/${selectedLead.id}/messages`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
         });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(data);
+        } else {
+          setMessages(getMockMessages(selectedLead.id));
+        }
+      } catch (err) {
+        setMessages(getMockMessages(selectedLead.id));
+      } finally {
+        setLoadingMessages(false);
       }
-    });
+    };
 
+    fetchMessages();
+  }, [selectedLead, session]);
+
+  useEffect(() => {
+    if (!socket || !selectedLead) return;
+    const handleNewMessage = (newMsg: Message) => {
+      if (newMsg.lead_id === selectedLead.id) {
+        setMessages((prev) => [...prev, newMsg]);
+      }
+    };
+    socket.on('new_message', handleNewMessage);
     return () => {
-      socket.off('MESSAGE_RECEIVED');
-      socket.off('MESSAGE_SENT');
+      socket.off('new_message', handleNewMessage);
     };
   }, [socket, selectedLead]);
 
-  // Send message handler
-  const handleSend = async (contentToSend: string) => {
-    if (!selectedLead || !contentToSend.trim() || !session) return;
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText.trim() || !selectedLead || !session) return;
 
     setSending(true);
+    const contentToSend = replyText;
+
     try {
-      const response = await fetch(`http://localhost:5000/api/leads/${selectedLead.id}/reply`, {
+      const res = await fetch(`http://localhost:5000/api/leads/${selectedLead.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,20 +128,19 @@ export const Inbox: React.FC = () => {
         body: JSON.stringify({ content: contentToSend }),
       });
 
-      if (response.ok) {
-        const newMsg = await response.json();
-        setMessages(prev => [...prev, newMsg]);
+      if (res.ok) {
+        const sentMsg = await res.json();
+        setMessages((prev) => [...prev, sentMsg]);
         setReplyText('');
       } else {
-        // Sandbox mock send fallback
         const mockNewMsg: Message = {
-          id: Math.random().toString(),
+          id: `msg_mock_${Date.now()}`,
           lead_id: selectedLead.id,
           direction: 'sent',
           content: contentToSend,
           created_at: new Date().toISOString(),
         };
-        setMessages(prev => [...prev, mockNewMsg]);
+        setMessages((prev) => [...prev, mockNewMsg]);
         setReplyText('');
       }
     } catch (err) {
@@ -178,26 +167,26 @@ export const Inbox: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 bg-slate-950 flex h-screen overflow-hidden">
+    <div className="flex-1 bg-[#0B0F14] flex h-screen overflow-hidden text-white">
       
       {/* Left Panel: Conversations List */}
-      <div className="w-80 border-r border-slate-800 bg-slate-900/30 flex flex-col shrink-0">
-        <div className="p-6 border-b border-slate-800">
-          <h3 className="font-extrabold text-lg text-white">Human Handoff</h3>
+      <div className="w-80 border-r border-[#EACEAA]/10 bg-[#34150F]/20 flex flex-col shrink-0">
+        <div className="p-6 border-b border-[#EACEAA]/10">
+          <h3 className="font-extrabold text-base tracking-tight gold-header">Human Handoff</h3>
           <p className="text-xs text-slate-400 mt-1">Genuinely interested replies waiting for you.</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {loadingLeads ? (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            <div className="h-full flex items-center justify-center text-slate-500 text-xs font-mono">
+              <Loader2 className="w-4 h-4 animate-spin mr-2 text-[#EACEAA]" />
               Loading handoffs...
             </div>
           ) : leads.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 p-4">
               <InboxIcon className="w-8 h-8 text-slate-600 mb-2" />
-              <p className="text-sm font-semibold">Inbox is clear!</p>
-              <p className="text-xs text-slate-500 mt-1">Leads with positive replies appear here.</p>
+              <p className="text-xs font-semibold text-slate-400">Inbox is clear!</p>
+              <p className="text-[10px] text-slate-500 mt-1">Leads with positive replies appear here.</p>
             </div>
           ) : (
             leads.map((lead) => (
@@ -206,184 +195,197 @@ export const Inbox: React.FC = () => {
                 onClick={() => setSelectedLead(lead)}
                 className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
                   selectedLead?.id === lead.id
-                    ? 'bg-indigo-600/10 border-indigo-500 text-white'
-                    : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 text-slate-300'
+                    ? 'bg-[#EACEAA]/15 border-[#EACEAA]/40 text-white shadow-lg'
+                    : 'bg-white/[0.01] border-white/5 hover:border-white/10 text-slate-300'
                 }`}
               >
                 <div className="flex justify-between items-start">
-                  <h4 className="font-bold text-sm truncate pr-2">{lead.name}</h4>
-                  <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded shrink-0 border ${
-                    lead.platform === 'linkedin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                    lead.platform === 'twitter' ? 'bg-slate-800 text-slate-400 border-slate-700' :
+                  <h4 className="font-bold text-xs truncate pr-2">{lead.name}</h4>
+                  <span className={`text-[8px] font-extrabold uppercase px-2 py-0.5 rounded shrink-0 border ${
+                    lead.platform === 'linkedin' ? 'bg-[#EACEAA]/10 text-[#EACEAA] border-[#EACEAA]/20' :
+                    lead.platform === 'twitter' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' :
                     'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                   }`}>
                     {lead.platform}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 truncate mt-1">{lead.company}</p>
-                <p className="text-[10px] text-indigo-400 italic truncate mt-2">{lead.reason}</p>
+                <p className="text-[10px] text-slate-400 mt-1 truncate">{lead.company}</p>
+                <div className="mt-2 text-[9px] text-[#EACEAA] font-mono bg-[#EACEAA]/5 px-2 py-1 rounded border border-[#EACEAA]/10">
+                  {lead.reason}
+                </div>
               </button>
             ))
           )}
         </div>
       </div>
 
-      {/* Right Panel: Chat Thread */}
-      <div className="flex-1 flex flex-col bg-slate-950/20 justify-between h-full">
+      {/* Right Panel: Active Conversation Thread */}
+      <div className="flex-1 flex flex-col h-full bg-[#0B0F14] relative">
+        <div className="absolute inset-0 hud-grid opacity-[0.1] pointer-events-none" />
+        
         {selectedLead ? (
           <>
-            {/* Active Chat Header */}
-            <div className="h-20 border-b border-slate-800 px-8 flex items-center justify-between shrink-0 bg-slate-950/40">
+            {/* Thread Header */}
+            <div className="p-6 border-b border-[#EACEAA]/10 flex justify-between items-center bg-[#34150F]/20 relative z-10">
               <div>
-                <h3 className="font-extrabold text-white text-base">{selectedLead.name}</h3>
-                <p className="text-xs text-slate-400">{selectedLead.company}</p>
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <span>{selectedLead.name}</span>
+                  <span className="text-xs font-mono font-normal text-slate-400">({selectedLead.company})</span>
+                </h3>
+                <p className="text-xs text-[#EACEAA] mt-0.5 font-mono">{selectedLead.reason}</p>
               </div>
+
               <a
                 href={selectedLead.profile_url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#EACEAA]/20 bg-[#EACEAA]/10 hover:bg-[#EACEAA] text-[#EACEAA] hover:text-[#0B0F14] text-xs font-bold transition-all"
               >
-                <span>Source Profile</span>
+                <span>View Profile</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
 
-            {/* Messages Thread */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-4">
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 relative z-10">
               {loadingMessages ? (
-                <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  Loading message history...
+                <div className="h-full flex items-center justify-center text-slate-500 text-xs font-mono">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2 text-[#EACEAA]" />
+                  Retrieving thread messages...
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center text-slate-500 text-xs my-8 font-mono">
+                  No conversation history logged yet. Start the thread below.
                 </div>
               ) : (
                 messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`flex ${msg.direction === 'sent' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex flex-col ${msg.direction === 'sent' ? 'items-end' : 'items-start'}`}
                   >
-                    <div className={`max-w-[70%] p-4 rounded-2xl text-sm leading-relaxed ${
-                      msg.direction === 'sent'
-                        ? 'bg-indigo-600 text-white rounded-tr-none'
-                        : 'bg-slate-900 border border-slate-850 text-slate-100 rounded-tl-none'
-                    }`}>
-                      <p>{msg.content}</p>
-                      <span className={`text-[9px] block mt-1.5 ${
-                        msg.direction === 'sent' ? 'text-indigo-200' : 'text-slate-500'
-                      }`}>
-                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                    <div
+                      className={`max-w-md p-4 rounded-2xl text-xs leading-relaxed ${
+                        msg.direction === 'sent'
+                          ? 'bg-[#EACEAA] text-[#0B0F14] font-medium shadow-lg'
+                          : 'bg-[#34150F]/40 border border-white/8 text-slate-200'
+                      }`}
+                    >
+                      {msg.content}
                     </div>
+                    <span className="text-[9px] text-slate-500 mt-1 px-1 font-mono">
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
                 ))
               )}
             </div>
 
-            {/* AI Quick Replies + Send Area */}
-            <div className="p-6 border-t border-slate-800 bg-slate-950/40 space-y-4 shrink-0">
+            {/* Quick Suggestions & Reply Input */}
+            <div className="p-6 border-t border-[#EACEAA]/10 bg-[#34150F]/20 space-y-4 relative z-10">
               
-              {/* Quick Replies Panel */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-1 text-indigo-400 font-bold text-xs">
-                  <Sparkles className="w-4 h-4 fill-current" />
-                  <span>Gemini Suggested Quick Replies</span>
+              {/* AI Assistant Quick Reply Chips */}
+              <div>
+                <div className="flex items-center gap-1.5 text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest mb-2">
+                  <Sparkles className="w-3 h-3 text-[#EACEAA]" />
+                  <span>AI Copilot Smart Response Options</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {getQuickReplies().map((reply) => (
+                  {getQuickReplies().map((suggestion, idx) => (
                     <button
-                      key={reply}
-                      onClick={() => handleSend(reply)}
-                      disabled={sending}
-                      className="text-xs bg-slate-900/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 px-3.5 py-2.5 rounded-xl text-left transition-all duration-200"
+                      key={idx}
+                      onClick={() => setReplyText(suggestion)}
+                      className="text-[10px] bg-white/[0.02] hover:bg-[#EACEAA]/10 text-slate-300 hover:text-[#EACEAA] border border-white/5 hover:border-[#EACEAA]/20 px-3 py-1.5 rounded-xl transition-all text-left"
                     >
-                      {reply}
+                      {suggestion}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Chat Input */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSend(replyText);
-                }}
-                className="flex gap-3"
-              >
+              {/* Text Area & Submit */}
+              <form onSubmit={handleSend} className="flex gap-3">
                 <input
                   type="text"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Type a manual response..."
-                  disabled={sending}
-                  className="flex-1 bg-slate-900/60 border border-slate-800 rounded-xl px-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Type your message or select an AI suggestion above..."
+                  className="flex-1 glass-input rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 font-mono"
                 />
                 <button
                   type="submit"
                   disabled={sending || !replyText.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 rounded-xl font-bold flex items-center justify-center shadow-lg shadow-indigo-600/10 active:scale-95 transition-all duration-200"
+                  className="btn-hud-primary px-6 rounded-xl text-xs flex items-center gap-2 font-black transition-all disabled:opacity-50"
                 >
-                  {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                  {sending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <span>Send</span>
+                      <Send className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </button>
               </form>
-
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-            <MessageSquare className="w-12 h-12 text-slate-700 mb-2" />
-            <h4 className="font-bold text-slate-400">No Conversation Selected</h4>
-            <p className="text-xs text-slate-500 mt-1">Select an active contact from the sidebar list to respond.</p>
+          <div className="h-full flex flex-col items-center justify-center text-slate-500">
+            <MessageSquare className="w-12 h-12 text-slate-700 mb-3" />
+            <p className="text-sm font-semibold text-slate-400">Select a conversation thread</p>
           </div>
         )}
       </div>
-
     </div>
   );
 };
 
-// Mock interested leads dataset
-function getMockInterestedLeads(platform: string): Lead[] {
-  const allLeads: Lead[] = [
+function getMockLeads(): Lead[] {
+  return [
     {
-      id: 'lead-1',
+      id: 'lead_1',
       name: 'Sarah Jenkins',
       platform: 'linkedin',
-      profile_url: 'http://localhost:5000/mock/linkedin/profile/sarah-jenkins',
-      company: 'Technical Recruiter at TechCorp',
+      profile_url: 'https://linkedin.com/in/sarahjenkins',
+      company: 'TechCorp Recruiter',
       status: 'interested',
-      reason: 'AI match score 85%. Interested in React/TS portfolio.',
+      reason: 'Asked for technical project portfolio link',
     },
     {
-      id: 'lead-2',
-      name: 'Elena Rostova',
+      id: 'lead_2',
+      name: 'Alex Rivera',
       platform: 'twitter',
-      profile_url: 'http://localhost:5000/mock/twitter',
-      company: 'Twitter/X Tech Lead',
+      profile_url: 'https://x.com/alexrivera_dev',
+      company: 'Founding Engineer @ StartupX',
       status: 'interested',
-      reason: 'AI match score 92%. Replied positively to tweet pitch.',
+      reason: 'Replied asking for freelance availability',
+    },
+    {
+      id: 'lead_3',
+      name: 'David Chen',
+      platform: 'upwork',
+      profile_url: 'https://upwork.com/freelancer/davidchen',
+      company: 'Agency Lead',
+      status: 'interested',
+      reason: 'Requested proposal quote for React Next.js contract',
     },
   ];
-  if (platform === 'all') return allLeads;
-  return allLeads.filter(l => l.platform === platform);
 }
 
-// Mock messages history
 function getMockMessages(leadId: string): Message[] {
   return [
     {
-      id: 'm1',
+      id: 'msg_1',
       lead_id: leadId,
       direction: 'sent',
-      content: 'Hi there, saw you are sourcing frontend developer talent. I specialize in react and node.js, check out my projects!',
-      created_at: new Date(Date.now() - 3600 * 2000).toISOString(),
+      content: "Hi there! I noticed you are hiring for React and TypeScript developers. I'd love to contribute.",
+      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
     },
     {
-      id: 'm2',
+      id: 'msg_2',
       lead_id: leadId,
       direction: 'received',
-      content: 'Hello! Thanks for connecting. Your skills and profile look promising. Are you available for a brief tech intro call next week?',
-      created_at: new Date(Date.now() - 3600 * 1000).toISOString(),
+      content: "Hey! Thanks for reaching out. Your profile looks interesting. Do you have a portfolio link or past projects?",
+      created_at: new Date(Date.now() - 3600000).toISOString(),
     },
   ];
 }

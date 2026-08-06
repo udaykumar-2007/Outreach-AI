@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore.js';
 import { useFilterStore } from '../store/filterStore.js';
+import { motion } from 'framer-motion';
 import { 
   Save, 
   User, 
@@ -99,7 +100,6 @@ export const Settings: React.FC = () => {
     const skillsArray = skills.split(',').map(s => s.trim()).filter(Boolean);
     const keywordsArray = keywords.split(',').map(k => k.trim()).filter(Boolean);
 
-    // 1. Update Profile details
     const profileSuccess = await updateProfile({
       full_name: fullName,
       bio,
@@ -128,10 +128,8 @@ export const Settings: React.FC = () => {
       return;
     }
 
-    // Keep global filter store persona in sync
     setPersona(role);
 
-    // 2. Save active Campaign settings
     if (session && !session.access_token.startsWith('mock_jwt')) {
       try {
         const activePlatforms: string[] = [];
@@ -140,7 +138,6 @@ export const Settings: React.FC = () => {
         if (activeUpwork) activePlatforms.push('upwork');
         if (activeDevto) activePlatforms.push('devto');
 
-        // Create campaign for each active platform
         for (const plat of activePlatforms) {
           await fetch('http://localhost:5000/api/campaigns', {
             method: 'POST',
@@ -164,277 +161,253 @@ export const Settings: React.FC = () => {
     setSavedSuccess(true);
     setSaving(false);
     
-    // Auto clear success indicator
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
   return (
-    <div className="flex-1 bg-slate-950 p-8 overflow-y-auto h-screen space-y-8">
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className="flex-1 bg-transparent p-6 overflow-y-auto h-screen space-y-6 pb-24"
+    >
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-extrabold text-white tracking-tight">Outreach Settings</h2>
-        <p className="text-sm text-slate-400">Configure target keywords, active platforms, and automate freelancer busy replies.</p>
+        <h2 className="text-2xl font-black tracking-tight gold-header">Outreach Settings</h2>
+        <p className="text-xs text-slate-400 mt-1 font-medium">Configure target keywords, active platforms, and automate freelancer busy replies.</p>
       </div>
 
       {/* Success/Error blocks */}
       {savedSuccess && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-4 py-3.5 rounded-xl flex items-center gap-2 font-medium">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-4 py-3 rounded-xl flex items-center gap-2 font-medium">
           <CheckCircle className="w-4 h-4 shrink-0" />
           <span>Settings saved successfully. Scanner jobs updated.</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs px-4 py-3.5 rounded-xl flex items-center gap-2 font-medium">
+        <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs px-4 py-3 rounded-xl flex items-center gap-2 font-medium">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* Settings Grid */}
-      <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         
         {/* Core Profile Settings */}
-        <div className="glass-panel p-6 rounded-2xl space-y-6">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-            <User className="w-5 h-5 text-indigo-400" />
-            <h3 className="font-bold text-base text-white">Profile Customization</h3>
+        <div className="glass-panel p-5 rounded-2xl space-y-5">
+          <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+            <User className="w-4.5 h-4.5 text-[#EACEAA]" />
+            <h3 className="font-extrabold text-xs text-white uppercase tracking-wider font-mono">Core Profile Settings</h3>
           </div>
 
           <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Full Name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Alex Rivera"
+                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Profile Persona</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as 'student' | 'freelancer')}
+                  className="w-full bg-[#080C16]/65 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="student">Student / Intern Seeker</option>
+                  <option value="freelancer">Freelancer / Developer</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Short Bio</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Brief summary of your skills and outreach intent..."
+                rows={2}
+                className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Persona Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="student">Student</option>
-                <option value="freelancer">Freelancer</option>
-              </select>
-            </div>
-
-            {/* Freelancer busy buffer settings */}
-            {role === 'freelancer' && (
-              <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-xl space-y-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-200">Freelancer Busy Mode</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Auto-apologize to leads, asking them to wait ~2 days.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsBusy(!isBusy)}
-                    className={`w-10 h-6 rounded-full p-0.5 transition-colors focus:outline-none ${
-                      isBusy ? 'bg-emerald-600' : 'bg-slate-800'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 ${
-                      isBusy ? 'translate-x-4' : 'translate-x-0'
-                    }`} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Short Bio</label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                rows={3}
-                placeholder="Talk about what you build and solve..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Skills (comma separated)</label>
+              <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Core Skills (comma separated)</label>
               <input
                 type="text"
                 value={skills}
                 onChange={(e) => setSkills(e.target.value)}
                 placeholder="React, TypeScript, Node.js"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200"
               />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-[#080C16]/25">
+              <div>
+                <h4 className="text-xs font-bold text-slate-200">Set Busy Buffer Message</h4>
+                <p className="text-[10px] text-slate-500 mt-0.5">Auto-respond to client opportunities when you are unavailable.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBusy(!isBusy)}
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-300 focus:outline-none ${
+                  isBusy ? 'bg-blue-600' : 'bg-slate-800'
+                }`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-300 ${
+                  isBusy ? 'translate-x-4' : 'translate-x-0'
+                }`} />
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Campaign Automation Settings */}
-        <div className="space-y-8">
-          
-          <div className="glass-panel p-6 rounded-2xl space-y-6">
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-              <Settings2 className="w-5 h-5 text-indigo-400" />
-              <h3 className="font-bold text-base text-white">Outreach Automation Config</h3>
-            </div>
+        {/* Campaign Targets & Channels */}
+        <div className="glass-panel p-5 rounded-2xl space-y-5">
+          <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+            <Settings2 className="w-4.5 h-4.5 text-purple-400" />
+            <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">Campaign Scanner Strategy</h3>
+          </div>
 
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Target Recruiter/Client Role</label>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Target Job/Role</label>
                 <input
                   type="text"
                   value={targetRole}
                   onChange={(e) => setTargetRole(e.target.value)}
-                  placeholder="e.g. Technical Recruiter or Engineering Lead"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. Technical Recruiter"
+                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Target Keywords (comma separated)</label>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Target Keywords</label>
                 <input
                   type="text"
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   placeholder="React, Frontend, Hiring, Contract"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200"
                   required
                 />
               </div>
+            </div>
 
-              {/* Checkboxes for active channels */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Active Outreach Channels</label>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-850 cursor-pointer select-none">
+            {/* Checkboxes for active channels */}
+            <div>
+              <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">Active Outreach Channels</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  { state: activeLinkedIn, setter: setActiveLinkedIn, label: 'LinkedIn crawler' },
+                  { state: activeTwitter, setter: setActiveTwitter, label: 'Twitter/X direct monitor' },
+                  { state: activeUpwork, setter: setActiveUpwork, label: 'Upwork search bids' },
+                  { state: activeDevto, setter: setActiveDevto, label: 'Dev.to article author crawler' }
+                ].map((channel, i) => (
+                  <label key={i} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-white/5 bg-[#080C16]/20 cursor-pointer select-none">
                     <input
                       type="checkbox"
-                      checked={activeLinkedIn}
-                      onChange={(e) => setActiveLinkedIn(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-800"
+                      checked={channel.state}
+                      onChange={(e) => channel.setter(e.target.checked)}
+                      className="rounded text-amber-500 focus:ring-amber-500 bg-[#080C16] border-white/10"
                     />
-                    <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">LinkedIn crawler</span>
+                    <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">{channel.label}</span>
                   </label>
-
-                  <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-850 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={activeTwitter}
-                      onChange={(e) => setActiveTwitter(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-800"
-                    />
-                    <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Twitter/X direct monitor</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-850 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={activeUpwork}
-                      onChange={(e) => setActiveUpwork(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-800"
-                    />
-                    <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Upwork search bids</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-850 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={activeDevto}
-                      onChange={(e) => setActiveDevto(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-800"
-                    />
-                    <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Dev.to article author crawler</span>
-                  </label>
-                </div>
+                ))}
               </div>
             </div>
           </div>
-
         </div>
 
         {/* Integrations & API Keys Panel */}
-        <div className="glass-panel p-6 rounded-2xl space-y-6 col-span-1 lg:col-span-2">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-            <Settings2 className="w-5 h-5 text-indigo-400" />
-            <h3 className="font-bold text-base text-white">API Keys & Integrations</h3>
+        <div className="glass-panel p-5 rounded-2xl space-y-5 col-span-1 lg:col-span-2">
+          <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+            <Settings2 className="w-4.5 h-4.5 text-[#EACEAA]" />
+            <h3 className="font-extrabold text-xs text-white uppercase tracking-wider font-mono">API Keys & Integrations</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Dev.to & LinkedIn */}
             <div className="space-y-4">
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Dev.to API Key</label>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Dev.to API Key</label>
                 <input
                   type="password"
                   value={devtoApiKey}
                   onChange={(e) => setDevtoApiKey(e.target.value)}
                   placeholder="Enter your Dev.to Developer API Key"
-                  className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
                 />
-                <p className="text-[10px] text-slate-500 mt-1">Used to automatically publish technical portfolio announcement articles.</p>
+                <p className="text-[9px] text-slate-500 mt-1 font-medium">Used to automatically publish technical portfolio announcement articles.</p>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">LinkedIn li_at Cookie</label>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">LinkedIn li_at Cookie</label>
                 <input
                   type="password"
                   value={linkedinLiAt}
                   onChange={(e) => setLinkedinLiAt(e.target.value)}
                   placeholder="AQEDAVtN0PUAKP..."
-                  className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
                 />
-                <p className="text-[10px] text-slate-500 mt-1">Your active session cookie (`li_at`) to authenticate the Playwright background bot.</p>
+                <p className="text-[9px] text-slate-500 mt-1 font-medium">Your active session cookie (`li_at`) to authenticate the Playwright background bot.</p>
               </div>
             </div>
 
-            {/* Twitter API Keys */}
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter API Key</label>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Twitter API Key</label>
                   <input
                     type="password"
                     value={twitterApiKey}
                     onChange={(e) => setTwitterApiKey(e.target.value)}
                     placeholder="API Key"
-                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter API Secret</label>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Twitter API Secret</label>
                   <input
                     type="password"
                     value={twitterApiSecret}
                     onChange={(e) => setTwitterApiSecret(e.target.value)}
                     placeholder="API Secret"
-                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter Access Token</label>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Twitter Access Token</label>
                   <input
                     type="password"
                     value={twitterAccessToken}
                     onChange={(e) => setTwitterAccessToken(e.target.value)}
                     placeholder="Access Token"
-                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter Access Secret</label>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Twitter Access Secret</label>
                   <input
                     type="password"
                     value={twitterAccessSecret}
                     onChange={(e) => setTwitterAccessSecret(e.target.value)}
                     placeholder="Access Secret"
-                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
                   />
                 </div>
               </div>
@@ -442,28 +415,30 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Global Save Button at the bottom */}
-        <div className="col-span-1 lg:col-span-2 pt-4">
-          <button
+        {/* Save button at the bottom */}
+        <div className="col-span-1 lg:col-span-2 pt-2">
+          <motion.button
+            whileHover={{ scale: 1.01, boxShadow: '0px 0px 20px rgba(234, 206, 170, 0.25)' }}
+            whileTap={{ scale: 0.99 }}
             type="submit"
             disabled={saving}
-            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:opacity-95 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10 transition-all duration-200"
+            className="w-full btn-hud-primary py-3.5 rounded-2xl font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg transition-all duration-300 disabled:opacity-50 font-mono"
           >
             {saving ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin text-[#080C16]" />
                 <span>Saving Configurations...</span>
               </>
             ) : (
               <>
-                <Save className="w-5 h-5" />
+                <Save className="w-4 h-4 text-[#080C16]" />
                 <span>Save All Settings</span>
               </>
             )}
-          </button>
+          </motion.button>
         </div>
 
       </form>
-    </div>
+    </motion.div>
   );
 };

@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore.js';
-import { useSocketStore } from '../store/socketStore.js';
+import { motion } from 'framer-motion';
 import { 
   Sparkles, 
   Plus, 
   Trash, 
-
   Eye, 
   Loader2, 
   ExternalLink,
   ClipboardCheck,
-  Clipboard
+  Clipboard,
+  Briefcase
 } from 'lucide-react';
 
 interface WorkSample {
@@ -22,7 +22,6 @@ interface WorkSample {
 
 export const Portfolio: React.FC = () => {
   const { session, profile, updateProfile } = useAuthStore();
-  const { socket } = useSocketStore();
 
   const [samples, setSamples] = useState<WorkSample[]>([]);
   const [newTitle, setNewTitle] = useState('');
@@ -38,7 +37,6 @@ export const Portfolio: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [autoposting, setAutoposting] = useState(false);
 
-  // Load profile work samples and portfolio config
   const loadPortfolioConfig = async () => {
     if (!session) return;
     if (profile?.work_samples) {
@@ -52,308 +50,290 @@ export const Portfolio: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         setSlug(data.slug || '');
-        setIsPublished(data.is_published || false);
-        setHtmlCode(data.html_code || '');
-        setCssCode(data.css_code || '');
-      } else {
-        // Mock fallback
-        setSlug('mock-designer');
-        setIsPublished(true);
-        setHtmlCode(getMockPortfolioHtml());
-        setCssCode(getMockPortfolioCss());
+        setIsPublished(data.published || false);
+        setHtmlCode(data.html_content || '');
+        setCssCode(data.css_content || '');
       }
-    } catch (e) {
-      setSlug('mock-designer');
-      setIsPublished(true);
-      setHtmlCode(getMockPortfolioHtml());
-      setCssCode(getMockPortfolioCss());
+    } catch (err) {
+      console.error('Failed to load portfolio config:', err);
     }
   };
 
   useEffect(() => {
     loadPortfolioConfig();
-  }, [session, profile]);
+  }, [session]);
 
-  // Listen for portfolio generation success from background worker via socket
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('PORTFOLIO_GENERATED', (data: { slug: string; is_published: boolean; message: string }) => {
-      console.log('[Socket] Portfolio generated successfully:', data);
-      setGenerating(false);
-      loadPortfolioConfig(); // Reload new html/css
-    });
-
-    return () => {
-      socket.off('PORTFOLIO_GENERATED');
-    };
-  }, [socket]);
-
-  const handleAutopost = async () => {
-    if (!session) return;
-    setAutoposting(true);
-    try {
-      const res = await fetch('http://localhost:5000/api/portfolio/autopost', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert('Autopost triggered! Check the WebSocket operations log on your Dashboard.');
-      } else {
-        alert(`Error: ${data.error || 'Failed to trigger autopost'}`);
-      }
-    } catch (err) {
-      console.error('Failed to run autopost:', err);
-      alert('Failed to connect to the autopost service.');
-    } finally {
-      setAutoposting(false);
-    }
-  };
-
-  // Add work sample
-  const handleAddSample = async (e: React.FormEvent) => {
+  const handleAddSample = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newDesc.trim()) return;
 
-    const techArray = newTech.split(',').map(t => t.trim()).filter(Boolean);
-    const newSample: WorkSample = {
-      title: newTitle,
-      description: newDesc,
-      technologies: techArray,
-      url: newUrl || undefined,
-    };
+    const techArray = newTech
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
 
-    const updatedSamples = [...samples, newSample];
-    setSamples(updatedSamples);
+    const updated = [
+      ...samples,
+      {
+        title: newTitle.trim(),
+        description: newDesc.trim(),
+        technologies: techArray,
+        url: newUrl.trim() || undefined,
+      },
+    ];
 
-    // Save profile to db
-    await updateProfile({ work_samples: updatedSamples });
+    setSamples(updated);
+    updateProfile({ work_samples: updated });
 
-    // Clear form
     setNewTitle('');
     setNewDesc('');
     setNewTech('');
     setNewUrl('');
   };
 
-  // Remove work sample
-  const handleRemoveSample = async (index: number) => {
+  const handleRemoveSample = (index: number) => {
     const updated = samples.filter((_, i) => i !== index);
     setSamples(updated);
-    await updateProfile({ work_samples: updated });
+    updateProfile({ work_samples: updated });
   };
 
-  // Call portfolio generation endpoint
-  const handleGenerate = async () => {
-    if (samples.length === 0) {
-      alert('Please add at least one project/work sample first.');
-      return;
-    }
+  const handleGeneratePortfolio = async () => {
     if (!session) return;
-
     setGenerating(true);
+
     try {
-      const response = await fetch('http://localhost:5000/api/portfolio/generate', {
+      const res = await fetch('http://localhost:5000/api/portfolio/generate', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        // Local simulation fallback
-        setTimeout(() => {
-          setHtmlCode(getMockPortfolioHtml());
-          setCssCode(getMockPortfolioCss());
-          setGenerating(false);
-        }, 3000);
-      }
-    } catch (e) {
-      // Offline fallback
-      setTimeout(() => {
-        setHtmlCode(getMockPortfolioHtml());
-        setCssCode(getMockPortfolioCss());
-        setGenerating(false);
-      }, 3000);
-    }
-  };
-
-  // Toggle publish state
-  const handleTogglePublish = async (publish: boolean) => {
-    if (!session) return;
-    setIsPublished(publish);
-    try {
-      await fetch('http://localhost:5000/api/portfolio/publish', {
-        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ is_published: publish, slug }),
+        body: JSON.stringify({
+          work_samples: samples,
+          theme: 'dark',
+        }),
       });
-    } catch (e) {
-      console.error('Failed to update publish settings:', e);
+
+      if (res.ok) {
+        const data = await res.json();
+        setSlug(data.slug);
+        setIsPublished(true);
+        setHtmlCode(data.html_content);
+        setCssCode(data.css_content);
+      } else {
+        const fallbackSlug = (profile?.full_name || 'operator').toLowerCase().replace(/\s+/g, '-');
+        setSlug(fallbackSlug);
+        setIsPublished(true);
+        setHtmlCode(getFallbackHtml(profile, samples));
+        setCssCode(getFallbackCss());
+      }
+    } catch (err) {
+      const fallbackSlug = (profile?.full_name || 'operator').toLowerCase().replace(/\s+/g, '-');
+      setSlug(fallbackSlug);
+      setIsPublished(true);
+      setHtmlCode(getFallbackHtml(profile, samples));
+      setCssCode(getFallbackCss());
+    } finally {
+      setGenerating(false);
     }
   };
 
-  const shareUrl = `http://localhost:5000/api/portfolio/${slug}`;
+  const handleDevToAutopost = async () => {
+    if (!session) return;
+    setAutoposting(true);
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(shareUrl);
+    try {
+      const res = await fetch('http://localhost:5000/api/portfolio/devto-autopost', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          title: `${profile?.full_name || 'Developer'} Portfolio Launch & Career Summary`,
+          tags: ['javascript', 'webdev', 'career', 'react'],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Successfully published portfolio announcement to Dev.to! Article URL: ${data.url}`);
+      } else {
+        const err = await res.json();
+        alert(`Dev.to auto-post failed: ${err.message || 'Check Dev.to API Key in Settings'}`);
+      }
+    } catch (err) {
+      alert('Failed to connect to Dev.to service. Please verify your server connection.');
+    } finally {
+      setAutoposting(false);
+    }
+  };
+
+  const handleCopyUrl = () => {
+    const publicUrl = `${window.location.origin}/portfolio/${slug}`;
+    navigator.clipboard.writeText(publicUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Combine HTML and CSS inside the iframe doc preview
-  const iframeSrcDoc = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          ${cssCode || 'body { background: #0f172a; color: #94a3b8; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }'}
-        </style>
-      </head>
-      <body>
-        ${htmlCode || '<div style="text-align: center;"><h1>No Portfolio Generated</h1><p>Add projects and click Generate above to build your web portfolio website!</p></div>'}
-      </body>
-    </html>
-  `;
-
   return (
-    <div className="flex-1 bg-slate-950 p-8 overflow-y-auto h-screen space-y-8">
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      className="flex-1 bg-[#0B0F14] text-white p-8 overflow-y-auto h-screen space-y-8 relative pb-24"
+    >
+      <div className="absolute inset-0 hud-grid opacity-[0.1] pointer-events-none" />
+
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-900 pb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
         <div>
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">Web Presence Generator</h2>
-          <p className="text-sm text-slate-400">Design your personal responsive web portfolio automatically using Gemini AI models.</p>
+          <h2 className="text-2xl font-black tracking-tight gold-header">Web Presence Generator</h2>
+          <p className="text-xs text-slate-400 mt-1 font-medium">Synthesize work samples, generate hosted web portfolios, and publish technical articles to Dev.to.</p>
         </div>
-        
-        {/* Generate Trigger */}
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:opacity-95 text-white px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-indigo-600/10 active:scale-98 transition-all duration-200 disabled:opacity-50"
-        >
-          {generating ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Generating Portfolio...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-5 h-5 fill-current animate-pulse" />
-              <span>Generate Web Portfolio</span>
-            </>
+
+        <div className="flex gap-2">
+          {isPublished && (
+            <button
+              onClick={handleDevToAutopost}
+              disabled={autoposting}
+              className="px-4 py-2 rounded-xl border border-[#EACEAA]/20 bg-[#EACEAA]/10 hover:bg-[#EACEAA] text-[#EACEAA] hover:text-[#0B0F14] text-xs font-black transition-all flex items-center gap-2"
+            >
+              {autoposting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              <span>Publish to Dev.to</span>
+            </button>
           )}
-        </button>
+
+          <button
+            onClick={handleGeneratePortfolio}
+            disabled={generating || samples.length === 0}
+            className="btn-hud-primary px-5 py-2 rounded-xl text-xs flex items-center gap-2 font-black transition-all disabled:opacity-50 shadow-lg shadow-amber-500/10"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Compiling Portfolio...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>Compile AI Web Presence</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
         
-        {/* Left Side: Work Samples Management */}
-        <div className="space-y-8">
+        {/* Left Col: Work Samples & Add Form */}
+        <div className="lg:col-span-2 space-y-6">
           
-          {/* Add Work Sample Form */}
-          <div className="glass-panel p-6 rounded-2xl space-y-4">
-            <h3 className="font-bold text-lg text-white">Add Project / Work Sample</h3>
+          {/* Add Sample Form */}
+          <div className="hud-card p-6 border-white/8 bg-[#34150F]/20 space-y-4">
+            <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+              <Briefcase className="w-4 h-4 text-[#EACEAA]" />
+              <h3 className="font-extrabold text-xs text-white uppercase tracking-wider font-mono">Add Work Sample / Case Study</h3>
+            </div>
+
             <form onSubmit={handleAddSample} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Project Title</label>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Project Title</label>
                   <input
                     type="text"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="e.g. Outreach AI Core"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                    placeholder="Autonomous Scraper Engine"
+                    className="w-full glass-input rounded-xl px-4 py-2 text-xs text-white placeholder-slate-600"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Demo URL (Optional)</label>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Project URL (Optional)</label>
                   <input
                     type="url"
                     value={newUrl}
                     onChange={(e) => setNewUrl(e.target.value)}
-                    placeholder="https://github.com/..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                    placeholder="https://github.com/username/project"
+                    className="w-full glass-input rounded-xl px-4 py-2 text-xs text-white placeholder-slate-600 font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Description</label>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Description & Key Contributions</label>
                 <textarea
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  placeholder="Describe your role and impact..."
+                  placeholder="Engineered high-performance Playwright crawlers and Node.js microservices..."
                   rows={2}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full glass-input rounded-xl px-4 py-2 text-xs text-white placeholder-slate-600"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Technologies (comma separated)</label>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Technologies (Comma separated)</label>
                 <input
                   type="text"
                   value={newTech}
                   onChange={(e) => setNewTech(e.target.value)}
-                  placeholder="React, TypeScript, Node.js"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  placeholder="React, TypeScript, Playwright, PostgreSQL"
+                  className="w-full glass-input rounded-xl px-4 py-2 text-xs text-white placeholder-slate-600 font-mono"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 rounded-xl border border-[#EACEAA]/20 bg-[#EACEAA]/10 hover:bg-[#EACEAA] text-[#EACEAA] hover:text-[#0B0F14] text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Work Sample</span>
+                <span>Add Work Sample to Portfolio</span>
               </button>
             </form>
           </div>
 
-          {/* List of projects */}
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg text-white px-1">Your Work Samples ({samples.length})</h3>
+          {/* Current Samples List */}
+          <div className="hud-card p-6 border-white/8 bg-[#34150F]/20 space-y-4">
+            <h3 className="font-extrabold text-xs text-slate-300 uppercase tracking-wider font-mono">Indexed Case Studies ({samples.length})</h3>
+
             {samples.length === 0 ? (
-              <p className="text-sm text-slate-500 italic px-1">No projects registered. Add one above to construct your portfolio index.</p>
+              <div className="py-8 text-center text-slate-500 text-xs italic font-mono">
+                No work samples added yet. Use the form above to add projects.
+              </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
                 {samples.map((sample, idx) => (
-                  <div key={idx} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col justify-between">
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-200">{sample.title}</h4>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-3">{sample.description}</p>
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        {sample.technologies.map(t => (
-                          <span key={t} className="text-[9px] font-semibold bg-slate-950 text-indigo-400 px-2 py-0.5 rounded border border-slate-850">
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl border border-white/5 bg-white/[0.01] hover:border-white/10 transition-all flex justify-between items-start group"
+                  >
+                    <div className="space-y-1 max-w-xl">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-xs text-white group-hover:text-[#EACEAA] transition-colors">{sample.title}</h4>
+                        {sample.url && (
+                          <a href={sample.url} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-white">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">{sample.description}</p>
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {sample.technologies.map((t) => (
+                          <span key={t} className="text-[9px] font-mono bg-white/[0.03] text-[#EACEAA] border border-[#EACEAA]/20 px-2 py-0.5 rounded">
                             {t}
                           </span>
                         ))}
                       </div>
                     </div>
-                    <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-850">
-                      {sample.url ? (
-                        <a href={sample.url} target="_blank" rel="noreferrer" className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1">
-                          <span>Demo Link</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : <span />}
-                      <button
-                        onClick={() => handleRemoveSample(idx)}
-                        className="text-rose-500 hover:text-rose-400 p-1 hover:bg-rose-500/5 rounded transition-colors"
-                      >
-                        <Trash className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+
+                    <button
+                      onClick={() => handleRemoveSample(idx)}
+                      className="text-slate-600 hover:text-red-400 transition-colors p-1"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -362,150 +342,71 @@ export const Portfolio: React.FC = () => {
 
         </div>
 
-        {/* Right Side: Preview & Settings */}
-        <div className="space-y-6 flex flex-col h-full">
-          
-          {/* Share links */}
-          <div className="glass-panel p-6 rounded-2xl space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-lg text-white">Publish Settings</h3>
-              
-              {/* Publish Toggle */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-bold">Published</span>
-                <button
-                  onClick={() => handleTogglePublish(!isPublished)}
-                  className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-                    isPublished ? 'bg-indigo-600' : 'bg-slate-800'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                    isPublished ? 'translate-x-5' : 'translate-x-0'
-                  }`} />
+        {/* Right Col: Live Preview Link & HTML Code */}
+        <div className="space-y-6">
+          {isPublished && (
+            <div className="hud-card p-6 border-[#EACEAA]/20 bg-[#EACEAA]/5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-mono font-black text-[#EACEAA] uppercase tracking-widest">LIVE PORTFOLIO ACTIVE</span>
+                <span className="w-2 h-2 rounded-full bg-[#EACEAA] animate-pulse" />
+              </div>
+
+              <div className="p-3 bg-[#0B0F14] border border-white/8 rounded-xl flex items-center justify-between font-mono text-xs">
+                <span className="text-slate-300 truncate mr-2">/portfolio/{slug}</span>
+                <button onClick={handleCopyUrl} className="text-[#EACEAA] hover:text-white transition-colors shrink-0">
+                  {copied ? <ClipboardCheck className="w-4 h-4" /> : <Clipboard className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
 
-            {/* Custom URL Input */}
-            <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest">Shareable Public Link</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))}
-                  placeholder="portfolio-slug"
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
-                />
-                
-                <button
-                  onClick={copyToClipboard}
-                  className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white px-4 rounded-xl flex items-center justify-center transition-colors"
-                >
-                  {copied ? <ClipboardCheck className="w-4 h-4 text-emerald-400" /> : <Clipboard className="w-4 h-4" />}
-                </button>
-
-                <a
-                  href={shareUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 rounded-xl flex items-center justify-center transition-colors font-bold text-xs"
-                >
-                  <Eye className="w-4 h-4" />
-                </a>
-              </div>
-              <p className="text-[10px] text-slate-500 italic font-mono truncate">{shareUrl}</p>
-            </div>
-
-            <div className="pt-2 border-t border-slate-800/40">
-              <button
-                type="button"
-                onClick={handleAutopost}
-                disabled={autoposting || !isPublished}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 transition-all duration-200 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              <a
+                href={`/portfolio/${slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full btn-hud-primary py-2.5 rounded-xl text-xs uppercase tracking-widest font-black transition-all flex items-center justify-center gap-2"
               >
-                {autoposting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Publishing Announcements...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4.5 h-4.5" />
-                    <span>Auto-Post Portfolio Announcement</span>
-                  </>
-                )}
-              </button>
+                <span>View Public Portfolio Page</span>
+                <Eye className="w-4 h-4" />
+              </a>
             </div>
-          </div>
+          )}
 
-          {/* IFrame Screen Preview */}
-          <div className="flex-1 glass-panel rounded-2xl overflow-hidden flex flex-col h-[500px]">
-            <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+          <div className="hud-card p-6 border-white/8 bg-[#34150F]/20 space-y-4">
+            <h3 className="font-extrabold text-xs text-slate-300 uppercase tracking-wider font-mono">Compiled Code Output</h3>
+
+            <div className="space-y-3 font-mono text-[10px]">
+              <div>
+                <span className="text-slate-500 block mb-1">HTML Component Markup</span>
+                <div className="h-32 bg-[#0B0F14] border border-white/5 rounded-xl p-3 text-slate-400 overflow-y-auto whitespace-pre">
+                  {htmlCode || '<!-- Click "Compile AI Web Presence" to generate HTML markup -->'}
+                </div>
               </div>
-              <span className="text-xs text-slate-400 font-bold ml-2 font-mono truncate">{slug}.outreach.ai</span>
-            </div>
-            <iframe
-              srcDoc={iframeSrcDoc}
-              title="Live Portfolio Preview"
-              className="flex-1 w-full bg-slate-900"
-            />
-          </div>
 
+              <div>
+                <span className="text-slate-500 block mb-1">CSS Design Tokens</span>
+                <div className="h-32 bg-[#0B0F14] border border-white/5 rounded-xl p-3 text-slate-400 overflow-y-auto whitespace-pre">
+                  {cssCode || '/* CSS design tokens compiled automatically */'}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
-
-    </div>
+    </motion.div>
   );
 };
 
-// Fallback HTML preview details
-function getMockPortfolioHtml() {
-  return `
-    <div class="portfolio-wrap">
-      <header class="hero">
-        <h1>Jane Developer</h1>
-        <p class="subtitle">Fullstack Architect | Web presence</p>
-        <p class="bio">Building clean SaaS interfaces, database engines, and automated microservice workflows.</p>
-      </header>
-      <section class="skills-sec">
-        <h2>Developer Toolkit</h2>
-        <div class="skills-grid">
-          <span class="skill-pill">React</span>
-          <span class="skill-pill">TypeScript</span>
-          <span class="skill-pill">Node.js</span>
-          <span class="skill-pill">Playwright</span>
-          <span class="skill-pill">Postgres</span>
-        </div>
-      </section>
-    </div>
-  `;
+function getFallbackHtml(profile: any, samples: WorkSample[]) {
+  return `<div class="portfolio-container">
+  <h1>${profile?.full_name || 'Operator'}</h1>
+  <p>${profile?.role === 'freelancer' ? 'Software Integration Engineer' : 'Computer Science Student'}</p>
+  <div class="samples">
+    ${samples.map((s) => `<div class="sample-card"><h3>${s.title}</h3><p>${s.description}</p></div>`).join('\n    ')}
+  </div>
+</div>`;
 }
 
-function getMockPortfolioCss() {
-  return `
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: #090d16;
-      color: #cbd5e1;
-      display: flex;
-      justify-content: center;
-      padding: 40px 20px;
-    }
-    .portfolio-wrap { max-width: 600px; width: 100%; }
-    .hero { text-align: center; padding: 40px 0; border-bottom: 1px solid #1e293b; }
-    .hero h1 { font-size: 2.5rem; margin: 0 0 8px 0; color: #ffffff; background: linear-gradient(to right, #6366f1, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;}
-    .subtitle { font-size: 1.1rem; color: #6366f1; margin: 0 0 15px 0; font-weight: bold; }
-    .bio { line-height: 1.6; color: #94a3b8; }
-    .skills-sec { padding: 30px 0; }
-    .skills-sec h2 { font-size: 1.5rem; color: white; margin-top: 0; }
-    .skills-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-    .skill-pill { background: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 500; }
-  `;
+function getFallbackCss() {
+  return `.portfolio-container { background: #0B0F14; color: #FFFFFF; font-family: sans-serif; padding: 40px; }
+.sample-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(234, 206, 170, 0.2); border-radius: 12px; padding: 20px; margin-top: 16px; }`;
 }

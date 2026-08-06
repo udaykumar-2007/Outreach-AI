@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuthStore } from './store/authStore.js';
 import { useSocketStore } from './store/socketStore.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
@@ -12,16 +13,32 @@ import { Pipeline } from './pages/Pipeline.js';
 import { Portfolio } from './pages/Portfolio.js';
 import { Settings } from './pages/Settings.js';
 import { PublicPortfolio } from './pages/PublicPortfolio.js';
+import { Landing } from './pages/Landing.js';
 
 // Layout wrapper for all protected routes
 const AppLayout: React.FC = () => {
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
+    <div className="flex h-screen overflow-hidden bg-[#0B0F14] text-slate-100 relative">
+      {/* Background HUD grid */}
+      <div className="absolute inset-0 hud-grid opacity-[0.15] pointer-events-none z-0" />
+
+      {/* Moving ambient blurred gradient circles */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full ambient-circle-1 pointer-events-none z-0" />
+      <div className="absolute bottom-[-15%] right-[-10%] w-[55%] h-[55%] rounded-full ambient-circle-2 pointer-events-none z-0" />
+
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative z-10">
         <Navbar />
-        <main className="flex-1 overflow-hidden flex flex-col">
-          <Outlet />
+        <main className="flex-1 overflow-hidden flex flex-col bg-transparent">
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.985, filter: 'blur(6px)' }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: -12, scale: 0.985, filter: 'blur(6px)' }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            <Outlet />
+          </motion.div>
         </main>
       </div>
     </div>
@@ -32,12 +49,10 @@ export const App: React.FC = () => {
   const { session, initialize } = useAuthStore();
   const { connectSocket, disconnectSocket } = useSocketStore();
 
-  // Initialize auth state
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  // Connect socket.io client once session token is verified
   useEffect(() => {
     if (session?.access_token) {
       connectSocket(session.access_token);
@@ -50,6 +65,7 @@ export const App: React.FC = () => {
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/portfolio/:slug" element={<PublicPortfolio />} />
 
@@ -66,9 +82,6 @@ export const App: React.FC = () => {
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/settings" element={<Settings />} />
-          
-          {/* Redirect root to dashboard */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Route>
 
         {/* Fallback redirect */}

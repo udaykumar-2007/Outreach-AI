@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore.js';
 import { useFilterStore } from '../store/filterStore.js';
 import { useSocketStore } from '../store/socketStore.js';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronRight, 
   ChevronLeft,
-  ExternalLink
+  ExternalLink,
+  Bot
 } from 'lucide-react';
 
 interface Lead {
@@ -20,11 +22,11 @@ interface Lead {
 }
 
 const COLUMNS = [
-  { id: 'discovered', name: 'Discovered', color: 'bg-slate-900 border-slate-800' },
-  { id: 'evaluated', name: 'Evaluated', color: 'bg-slate-900 border-indigo-950' },
-  { id: 'messaged', name: 'Message Sent', color: 'bg-slate-900 border-blue-950' },
-  { id: 'interested', name: 'Interested (Handoff)', color: 'bg-slate-900 border-emerald-950' },
-  { id: 'converted', name: 'Converted', color: 'bg-slate-900 border-amber-950' },
+  { id: 'discovered', name: 'Discovered', color: 'border-white/5 bg-[#34150F]/10' },
+  { id: 'evaluated', name: 'Evaluated', color: 'border-white/5 bg-[#34150F]/20' },
+  { id: 'messaged', name: 'Message Sent', color: 'border-white/5 bg-[#34150F]/30' },
+  { id: 'interested', name: 'Interested', color: 'border-[#EACEAA]/20 bg-[#EACEAA]/5' },
+  { id: 'converted', name: 'Converted', color: 'border-[#D39858]/30 bg-[#D39858]/10' },
 ] as const;
 
 export const Pipeline: React.FC = () => {
@@ -34,7 +36,6 @@ export const Pipeline: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch leads with status filters matching Kanban
   const fetchPipelineLeads = async () => {
     if (!session) return;
     try {
@@ -47,10 +48,10 @@ export const Pipeline: React.FC = () => {
         const data = await res.json();
         setLeads(data);
       } else {
-        setLeads(getMockPipelineLeads(platform));
+        setLeads(getMockPipelineLeads());
       }
-    } catch (e) {
-      setLeads(getMockPipelineLeads(platform));
+    } catch (err) {
+      setLeads(getMockPipelineLeads());
     } finally {
       setLoading(false);
     }
@@ -60,241 +61,252 @@ export const Pipeline: React.FC = () => {
     fetchPipelineLeads();
   }, [session, platform]);
 
-  // Sync real-time lead discoveries / scoring via Socket.io
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('LEAD_FOUND', (data: { lead: Lead }) => {
-      setLeads((prev) => {
-        if (prev.find(l => l.id === data.lead.id)) return prev;
-        return [data.lead, ...prev];
-      });
-    });
+    const handleLeadDiscovered = (data: any) => {
+      if (data.lead) {
+        setLeads((prev) => {
+          if (prev.some((l) => l.id === data.lead.id)) return prev;
+          return [data.lead, ...prev];
+        });
+      }
+    };
 
-    socket.on('LEAD_SCORED', (data: { lead: Lead }) => {
-      setLeads((prev) => {
-        const filtered = prev.filter(l => l.id !== data.lead.id);
-        return [data.lead, ...filtered];
-      });
-    });
+    const handleLeadScored = (data: any) => {
+      if (data.lead) {
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === data.lead.id || l.name === data.lead.name
+              ? { ...l, match_score: data.lead.match_score, status: 'evaluated' }
+              : l
+          )
+        );
+      }
+    };
+
+    const handleMessageSent = (data: any) => {
+      setLeads((prev) =>
+        prev.map((l) => (l.id === data.leadId ? { ...l, status: 'messaged' } : l))
+      );
+    };
+
+    socket.on('lead_discovered', handleLeadDiscovered);
+    socket.on('lead_scored', handleLeadScored);
+    socket.on('message_sent', handleMessageSent);
 
     return () => {
-      socket.off('LEAD_FOUND');
-      socket.off('LEAD_SCORED');
+      socket.off('lead_discovered', handleLeadDiscovered);
+      socket.off('lead_scored', handleLeadScored);
+      socket.off('message_sent', handleMessageSent);
     };
   }, [socket]);
 
-  // Transition lead status
-  const moveLead = async (leadId: string, nextStatus: Lead['status']) => {
-    // Optimistic UI state update
+  const updateLeadStatus = async (leadId: string, newStatus: Lead['status']) => {
     setLeads((prev) =>
-      prev.map((lead) => (lead.id === leadId ? { ...lead, status: nextStatus } : lead))
+      prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
     );
 
-    if (session && !session.access_token.startsWith('mock_jwt')) {
-      try {
-        // Find lead details first to get matching endpoints, or update leads database directly using supabase client!
-        // Yes, supabase user client runs RLS policies. Wait, Express doesn't have a direct lead PATCH status, but we can write a simple PATCH endpoint or just call database updates. Wait, in the server routes we did not implement an explicit PATCH lead status route, but we can call supabase directly from frontend or update via Express. Wait! Calling database update directly using client-side Supabase client is the canonical Supabase way!
-        // Auth store already imported
-        const { supabase } = await import('../store/authStore.js');
-        if (supabase) {
-          await supabase
-            .from('leads')
-            .update({ status: nextStatus })
-            .eq('id', leadId);
-        }
-      } catch (err) {
-        console.error('Failed to update lead status on database:', err);
-      }
+    if (!session) return;
+    try {
+      await fetch(`http://localhost:5000/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (err) {
+      console.error('Failed to update lead status:', err);
     }
   };
 
-  const getLeadsByStatus = (statusId: typeof COLUMNS[number]['id']) => {
-    // Exclude rejected status from display in Kanban
-    return leads.filter((lead) => lead.status === statusId);
+  const getNextStatus = (current: Lead['status']): Lead['status'] | null => {
+    const order: Lead['status'][] = ['discovered', 'evaluated', 'messaged', 'interested', 'converted'];
+    const idx = order.indexOf(current);
+    if (idx !== -1 && idx < order.length - 1) return order[idx + 1];
+    return null;
   };
 
-  // Get color for match score
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-    if (score >= 60) return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
-    return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+  const getPrevStatus = (current: Lead['status']): Lead['status'] | null => {
+    const order: Lead['status'][] = ['discovered', 'evaluated', 'messaged', 'interested', 'converted'];
+    const idx = order.indexOf(current);
+    if (idx > 0) return order[idx - 1];
+    return null;
   };
 
   return (
-    <div className="flex-1 bg-slate-950 p-8 overflow-y-auto h-screen space-y-8">
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      className="flex-1 bg-[#0B0F14] text-white p-8 overflow-x-auto h-screen space-y-6 relative"
+    >
+      <div className="absolute inset-0 hud-grid opacity-[0.1] pointer-events-none" />
+
       {/* Header */}
-      <div>
-        <h2 className="text-3xl font-extrabold text-white tracking-tight font-sans">CRM Pipeline</h2>
-        <p className="text-sm text-slate-400">Track candidates and prospects as they proceed through outreach scoring and responses.</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight gold-header">Prospect Pipeline</h2>
+          <p className="text-xs text-slate-400 mt-1 font-medium">Real-time status tracking for crawler matches, proposal pitches, and recruiter replies.</p>
+        </div>
+
+        <div className="flex items-center gap-2 font-mono text-xs bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-xl">
+          <Bot className="w-4 h-4 text-[#EACEAA]" />
+          <span className="text-slate-400">Total Tracked:</span>
+          <span className="font-extrabold text-[#EACEAA]">{leads.length}</span>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="h-64 flex items-center justify-center text-slate-500">Loading pipeline board...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 items-start">
-          {COLUMNS.map((col) => {
-            const colLeads = getLeadsByStatus(col.id);
-            return (
-              <div key={col.id} className="flex flex-col space-y-4">
-                {/* Column Header */}
-                <div className="flex justify-between items-center px-2">
-                  <h4 className="font-bold text-sm text-slate-200 tracking-wide">{col.name}</h4>
-                  <span className="text-xs font-black text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-lg">
-                    {colLeads.length}
-                  </span>
-                </div>
+      {/* Kanban Board Columns */}
+      <div className="flex gap-4 items-start min-w-[1100px] h-[calc(100vh-160px)] pb-4 relative z-10">
+        {COLUMNS.map((col) => {
+          const colLeads = leads.filter((l) => l.status === col.id);
 
-                {/* Column Body */}
-                <div className={`p-4 rounded-2xl border ${col.color} space-y-3 min-h-[450px] bg-slate-900/10 backdrop-blur-sm`}>
-                  {colLeads.length === 0 ? (
-                    <div className="h-40 flex items-center justify-center text-center text-xs text-slate-600 italic">
-                      Empty column
-                    </div>
-                  ) : (
-                    colLeads.map((lead) => (
-                      <div key={lead.id} className="bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 p-4 rounded-xl space-y-3 transition-all duration-200 group">
-                        
-                        {/* Name & Badge */}
-                        <div className="flex justify-between items-start gap-2">
-                          <h5 className="font-bold text-sm text-slate-200 truncate">{lead.name}</h5>
-                          <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 border ${
-                            lead.platform === 'linkedin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                            lead.platform === 'twitter' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                            lead.platform === 'devto' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                            'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          }`}>
-                            {lead.platform === 'devto' ? 'dev.to' : lead.platform}
-                          </span>
-                        </div>
-
-                        <p className="text-xs text-slate-400 line-clamp-1">{lead.company}</p>
-
-                        {/* Match Score & Link */}
-                        <div className="flex justify-between items-center pt-2">
-                          <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getScoreColor(lead.match_score)}`}>
-                            Score: {lead.match_score}%
-                          </div>
-                          
-                          <a
-                            href={lead.profile_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-slate-500 hover:text-indigo-400 transition-colors"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </div>
-
-                        {/* Reason / AI analysis */}
-                        <p className="text-[10px] text-slate-500 italic line-clamp-2 pt-1 border-t border-slate-850">
-                          {lead.reason}
-                        </p>
-
-                        {/* Control buttons to shift status */}
-                        <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-850">
-                          {col.id !== 'discovered' && (
-                            <button
-                              onClick={() => {
-                                const idx = COLUMNS.findIndex(c => c.id === col.id);
-                                if (idx > 0) moveLead(lead.id, COLUMNS[idx - 1].id);
-                              }}
-                              className="p-1 rounded bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white"
-                            >
-                              <ChevronLeft className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {col.id !== 'converted' && (
-                            <button
-                              onClick={() => {
-                                const idx = COLUMNS.findIndex(c => c.id === col.id);
-                                if (idx < COLUMNS.length - 1) moveLead(lead.id, COLUMNS[idx + 1].id);
-                              }}
-                              className="p-1 rounded bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white"
-                            >
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-
-                      </div>
-                    ))
-                  )}
-                </div>
+          return (
+            <div
+              key={col.id}
+              className={`flex-1 min-w-[220px] max-w-[280px] rounded-2xl border ${col.color} p-4 flex flex-col h-full backdrop-blur-xl shadow-xl`}
+            >
+              {/* Column Header */}
+              <div className="flex justify-between items-center pb-3 border-b border-white/5 mb-3">
+                <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-300 font-mono">{col.name}</h3>
+                <span className="text-[10px] font-mono font-black bg-white/[0.04] text-[#EACEAA] border border-white/5 px-2 py-0.5 rounded-full">
+                  {colLeads.length}
+                </span>
               </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+
+              {/* Cards Container */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {loading ? (
+                  <div className="h-20 bg-white/[0.02] border border-white/5 animate-pulse rounded-xl" />
+                ) : colLeads.length === 0 ? (
+                  <div className="h-32 border border-dashed border-white/5 rounded-xl flex items-center justify-center text-[10px] text-slate-600 font-mono italic">
+                    NO_LEADS_QUEUED
+                  </div>
+                ) : (
+                  <AnimatePresence>
+                    {colLeads.map((lead) => {
+                      const next = getNextStatus(lead.status);
+                      const prev = getPrevStatus(lead.status);
+
+                      return (
+                        <motion.div
+                          key={lead.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={{ duration: 0.3 }}
+                          className="hud-card p-4 border-white/8 bg-[#34150F]/20 space-y-3 relative group"
+                        >
+                          <div className="flex justify-between items-start">
+                            <h4 className="font-bold text-xs text-white group-hover:text-[#EACEAA] transition-colors">{lead.name}</h4>
+                            <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded border ${
+                              lead.platform === 'linkedin' ? 'bg-[#EACEAA]/10 text-[#EACEAA] border-[#EACEAA]/20' :
+                              lead.platform === 'twitter' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' :
+                              lead.platform === 'devto' ? 'bg-purple-500/10 text-purple-300 border-purple-500/20' :
+                              'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            }`}>
+                              {lead.platform === 'devto' ? 'dev.to' : lead.platform}
+                            </span>
+                          </div>
+
+                          <p className="text-[10px] text-slate-400 truncate">{lead.company}</p>
+
+                          {/* Match rating badge */}
+                          <div className="flex justify-between items-center text-[9px] font-mono">
+                            <span className="text-slate-500">Rating</span>
+                            <span className="font-bold text-[#EACEAA]">{lead.match_score}% Match</span>
+                          </div>
+
+                          {/* Action navigation */}
+                          <div className="flex justify-between items-center pt-2 border-t border-white/5">
+                            <a
+                              href={lead.profile_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-slate-500 hover:text-white transition-colors"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+
+                            <div className="flex gap-1">
+                              {prev && (
+                                <button
+                                  onClick={() => updateLeadStatus(lead.id, prev)}
+                                  className="p-1 rounded bg-white/[0.03] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-colors"
+                                  title={`Move to ${prev}`}
+                                >
+                                  <ChevronLeft className="w-3 h-3" />
+                                </button>
+                              )}
+                              {next && (
+                                <button
+                                  onClick={() => updateLeadStatus(lead.id, next)}
+                                  className="p-1 rounded bg-[#EACEAA]/10 hover:bg-[#EACEAA] text-[#EACEAA] hover:text-[#0B0F14] transition-colors"
+                                  title={`Move to ${next}`}
+                                >
+                                  <ChevronRight className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 };
 
-// Mock pipeline leads
-function getMockPipelineLeads(platform: string): Lead[] {
-  const allLeads: Lead[] = [
+function getMockPipelineLeads(): Lead[] {
+  return [
     {
-      id: 'l1',
-      name: 'Alex Rivera',
+      id: 'lead_101',
+      name: 'Michael Scott',
       platform: 'linkedin',
-      profile_url: 'http://localhost:5000/mock/linkedin/profile/alex-rivera',
-      company: 'Lead Frontend Engineer | Seeking React Developers',
-      match_score: 95,
-      status: 'discovered',
-      reason: 'Recruiter looking for React skills, high match.',
-    },
-    {
-      id: 'l2',
-      name: 'Sarah Jenkins',
-      platform: 'linkedin',
-      profile_url: 'http://localhost:5000/mock/linkedin/profile/sarah-jenkins',
-      company: 'Technical Recruiter at TechCorp',
-      match_score: 85,
-      status: 'interested',
-      reason: 'AI match score 85%. Recruiter interested in portfolio link.',
-    },
-    {
-      id: 'l3',
-      name: 'David Chen',
-      platform: 'linkedin',
-      profile_url: 'http://localhost:5000/mock/linkedin/profile/david-chen',
-      company: 'CTO & Founder (Looking for freelancers)',
-      match_score: 78,
-      status: 'evaluated',
-      reason: 'CTO looking for freelancer with react skills, good match.',
-    },
-    {
-      id: 'l4',
-      name: 'Elena Rostova',
-      platform: 'twitter',
-      profile_url: 'http://localhost:5000/mock/twitter',
-      company: 'Twitter/X Tech Lead',
+      profile_url: 'https://linkedin.com/in/michaelscott',
+      company: 'Dunder Mifflin Tech',
       match_score: 92,
-      status: 'messaged',
-      reason: 'AI match score 92%. Message sent to DM thread.',
-    },
-    {
-      id: 'l5',
-      name: 'Marcus Brody',
-      platform: 'upwork',
-      profile_url: 'http://localhost:5000/mock/upwork',
-      company: 'SaaS Dashboard Project Manager',
-      match_score: 80,
-      status: 'converted',
-      reason: 'Contract signed! Freelancer client landed.',
-    },
-    {
-      id: 'l6',
-      name: 'Rohan Sharma',
-      platform: 'devto',
-      profile_url: 'https://dev.to/rohan_codes',
-      company: 'Senior Software Engineer (Writing about React)',
-      match_score: 89,
       status: 'discovered',
-      reason: 'Regularly posts high-quality React guides. High outreach match.',
+      reason: 'Tech recruiter search keyword match',
+    },
+    {
+      id: 'lead_102',
+      name: 'Pam Beesly',
+      platform: 'twitter',
+      profile_url: 'https://x.com/pam_designs',
+      company: 'Scranton Studios',
+      match_score: 88,
+      status: 'evaluated',
+      reason: 'UI/UX Developer opportunity',
+    },
+    {
+      id: 'lead_103',
+      name: 'Jim Halpert',
+      platform: 'upwork',
+      profile_url: 'https://upwork.com/freelancer/jimhalpert',
+      company: 'Athlead Software',
+      match_score: 95,
+      status: 'messaged',
+      reason: 'Direct proposal sent on Upwork',
+    },
+    {
+      id: 'lead_104',
+      name: 'Dwight Schrute',
+      platform: 'devto',
+      profile_url: 'https://dev.to/dwightschrute',
+      company: 'Beet Algorithms',
+      match_score: 84,
+      status: 'interested',
+      reason: 'Commented on portfolio article',
     },
   ];
-
-  if (platform === 'all') return allLeads;
-  return allLeads.filter(l => l.platform === platform);
 }

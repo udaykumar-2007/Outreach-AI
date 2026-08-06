@@ -1,13 +1,12 @@
 import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useFilterStore } from '../store/filterStore.js';
 import { useAuthStore } from '../store/authStore.js';
-
 
 export const Navbar: React.FC = () => {
   const { persona, setPersona, platform, setPlatform } = useFilterStore();
   const { profile } = useAuthStore();
 
-  // Keep persona in sync with profile role initially
   useEffect(() => {
     if (profile?.role) {
       setPersona(profile.role);
@@ -15,53 +14,64 @@ export const Navbar: React.FC = () => {
   }, [profile, setPersona]);
 
   return (
-    <header className="h-20 border-b border-slate-800 bg-slate-950/45 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-40">
+    <motion.header 
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="h-16 border-b border-[#EACEAA]/10 bg-[#0B0F14]/70 backdrop-blur-xl px-8 flex items-center justify-between sticky top-0 z-40"
+    >
       {/* Persona Toggle */}
       <div className="flex items-center gap-3">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Persona</span>
-        <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex gap-1">
-          <button
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">Active Mode</span>
+        <div className="bg-[#34150F]/20 border border-[#EACEAA]/10 p-0.5 rounded-xl flex gap-0.5">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setPersona('student')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+            className={`px-3.5 py-1 rounded-lg text-[11px] font-bold transition-all duration-300 ${
               persona === 'student'
-                ? 'bg-blue-600 text-white shadow shadow-blue-500/20'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#EACEAA]/15 text-[#EACEAA] border border-[#EACEAA]/20 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 border border-transparent'
             }`}
           >
             Student Mode
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setPersona('freelancer')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+            className={`px-3.5 py-1 rounded-lg text-[11px] font-bold transition-all duration-300 ${
               persona === 'freelancer'
-                ? 'bg-emerald-600 text-white shadow shadow-emerald-500/20'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#EACEAA]/15 text-[#EACEAA] border border-[#EACEAA]/20 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 border border-transparent'
             }`}
           >
             Freelancer Mode
-          </button>
+          </motion.button>
         </div>
       </div>
 
       {/* Platform Filters */}
       <div className="flex items-center gap-4">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest hidden sm:inline">Platform Filter</span>
-        <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex gap-1">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono hidden sm:inline">Platform Filter</span>
+        <div className="bg-[#34150F]/20 border border-[#EACEAA]/10 p-0.5 rounded-xl flex gap-0.5">
           {(['all', 'linkedin', 'twitter', 'upwork', 'devto'] as const).map((p) => (
-            <button
+            <motion.button
               key={p}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setPlatform(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border ${
                 platform === p
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#EACEAA]/15 border-[#EACEAA]/30 text-[#EACEAA] shadow-sm'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
               }`}
             >
-              {p === 'devto' ? 'dev.to' : p}
-            </button>
+              {p === 'devto' ? 'dev.to' : p === 'all' ? 'All Channels' : p}
+            </motion.button>
           ))}
         </div>
       </div>
-    </header>
+    </motion.header>
   );
 };
