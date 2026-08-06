@@ -11,5 +11,6 @@ export const redisConnection = new IORedis(redisUrl, {
 
 import { Queue } from 'bullmq';
 export const outreachQueue = new Queue('outreach-queue', { connection: redisConnection });
+export const autopostQueue = new Queue('autopost-queue', { connection: redisConnection });
 
 console.log('Worker Redis connection established with:', redisUrl);

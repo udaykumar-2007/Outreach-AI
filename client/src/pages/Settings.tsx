@@ -21,6 +21,14 @@ export const Settings: React.FC = () => {
   const [role, setRole] = useState<'student' | 'freelancer'>('student');
   const [isBusy, setIsBusy] = useState(false);
 
+  // API Integrations settings
+  const [linkedinLiAt, setLinkedinLiAt] = useState('');
+  const [twitterApiKey, setTwitterApiKey] = useState('');
+  const [twitterApiSecret, setTwitterApiSecret] = useState('');
+  const [twitterAccessToken, setTwitterAccessToken] = useState('');
+  const [twitterAccessSecret, setTwitterAccessSecret] = useState('');
+  const [devtoApiKey, setDevtoApiKey] = useState('');
+
   // Campaign configurations
   const [targetRole, setTargetRole] = useState('');
   const [keywords, setKeywords] = useState('');
@@ -45,6 +53,14 @@ export const Settings: React.FC = () => {
       setActiveLinkedIn(platforms.linkedin !== false);
       setActiveTwitter(platforms.twitter !== false);
       setActiveUpwork(platforms.upwork !== false);
+
+      const keys = (profile as any).api_keys || {};
+      setLinkedinLiAt(keys.linkedin_li_at || '');
+      setTwitterApiKey(keys.twitter_api_key || '');
+      setTwitterApiSecret(keys.twitter_api_secret || '');
+      setTwitterAccessToken(keys.twitter_access_token || '');
+      setTwitterAccessSecret(keys.twitter_access_secret || '');
+      setDevtoApiKey(keys.devto_api_key || '');
     }
     loadCampaignSettings();
   }, [profile]);
@@ -93,7 +109,15 @@ export const Settings: React.FC = () => {
         twitter: activeTwitter,
         upwork: activeUpwork,
       },
-    });
+      api_keys: {
+        linkedin_li_at: linkedinLiAt || null,
+        twitter_api_key: twitterApiKey || null,
+        twitter_api_secret: twitterApiSecret || null,
+        twitter_access_token: twitterAccessToken || null,
+        twitter_access_secret: twitterAccessSecret || null,
+        devto_api_key: devtoApiKey || null,
+      },
+    } as any);
 
     if (!profileSuccess) {
       setErrorMsg('Failed to update core profile settings.');
@@ -334,6 +358,92 @@ export const Settings: React.FC = () => {
             )}
           </button>
 
+        </div>
+
+        {/* Integrations & API Keys Panel */}
+        <div className="glass-panel p-6 rounded-2xl space-y-6 col-span-1 lg:col-span-2">
+          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+            <Settings2 className="w-5 h-5 text-indigo-400" />
+            <h3 className="font-bold text-base text-white">API Keys & Integrations</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Dev.to & LinkedIn */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Dev.to API Key</label>
+                <input
+                  type="password"
+                  value={devtoApiKey}
+                  onChange={(e) => setDevtoApiKey(e.target.value)}
+                  placeholder="Enter your Dev.to Developer API Key"
+                  className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Used to automatically publish technical portfolio announcement articles.</p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">LinkedIn li_at Cookie</label>
+                <input
+                  type="password"
+                  value={linkedinLiAt}
+                  onChange={(e) => setLinkedinLiAt(e.target.value)}
+                  placeholder="AQEDAVtN0PUAKP..."
+                  className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Your active session cookie (`li_at`) to authenticate the Playwright background bot.</p>
+              </div>
+            </div>
+
+            {/* Twitter API Keys */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter API Key</label>
+                  <input
+                    type="password"
+                    value={twitterApiKey}
+                    onChange={(e) => setTwitterApiKey(e.target.value)}
+                    placeholder="API Key"
+                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter API Secret</label>
+                  <input
+                    type="password"
+                    value={twitterApiSecret}
+                    onChange={(e) => setTwitterApiSecret(e.target.value)}
+                    placeholder="API Secret"
+                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter Access Token</label>
+                  <input
+                    type="password"
+                    value={twitterAccessToken}
+                    onChange={(e) => setTwitterAccessToken(e.target.value)}
+                    placeholder="Access Token"
+                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Twitter Access Secret</label>
+                  <input
+                    type="password"
+                    value={twitterAccessSecret}
+                    onChange={(e) => setTwitterAccessSecret(e.target.value)}
+                    placeholder="Access Secret"
+                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
       </form>

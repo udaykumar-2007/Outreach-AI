@@ -2,6 +2,7 @@ import { scanWorker } from './workers/scanWorker.js';
 import { outreachWorker } from './workers/outreachWorker.js';
 import { inboxWorker } from './workers/inboxWorker.js';
 import { portfolioWorker } from './workers/portfolioWorker.js';
+import { autopostWorker } from './workers/autopostWorker.js';
 import { redisConnection } from './queues.js';
 
 console.log('===================================================');
@@ -10,6 +11,7 @@ console.log(' - scan-queue listener active');
 console.log(' - outreach-queue listener active');
 console.log(' - inbox-queue listener active');
 console.log(' - portfolio-queue listener active');
+console.log(' - autopost-queue listener active');
 console.log('===================================================');
 
 // Graceful shutdown
@@ -22,6 +24,7 @@ const gracefulShutdown = async (signal: string) => {
     await outreachWorker.close();
     await inboxWorker.close();
     await portfolioWorker.close();
+    await autopostWorker.close();
     console.log('BullMQ worker connections closed.');
     
     // Close redis connection

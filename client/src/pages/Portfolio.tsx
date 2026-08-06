@@ -36,6 +36,7 @@ export const Portfolio: React.FC = () => {
   const [htmlCode, setHtmlCode] = useState('');
   const [cssCode, setCssCode] = useState('');
   const [copied, setCopied] = useState(false);
+  const [autoposting, setAutoposting] = useState(false);
 
   // Load profile work samples and portfolio config
   const loadPortfolioConfig = async () => {
@@ -87,6 +88,31 @@ export const Portfolio: React.FC = () => {
       socket.off('PORTFOLIO_GENERATED');
     };
   }, [socket]);
+
+  const handleAutopost = async () => {
+    if (!session) return;
+    setAutoposting(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/portfolio/autopost', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Autopost triggered! Check the WebSocket operations log on your Dashboard.');
+      } else {
+        alert(`Error: ${data.error || 'Failed to trigger autopost'}`);
+      }
+    } catch (err) {
+      console.error('Failed to run autopost:', err);
+      alert('Failed to connect to the autopost service.');
+    } finally {
+      setAutoposting(false);
+    }
+  };
 
   // Add work sample
   const handleAddSample = async (e: React.FormEvent) => {
@@ -389,6 +415,27 @@ export const Portfolio: React.FC = () => {
                 </a>
               </div>
               <p className="text-[10px] text-slate-500 italic font-mono truncate">{shareUrl}</p>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800/40">
+              <button
+                type="button"
+                onClick={handleAutopost}
+                disabled={autoposting || !isPublished}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 transition-all duration-200 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {autoposting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Publishing Announcements...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4.5 h-4.5" />
+                    <span>Auto-Post Portfolio Announcement</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 

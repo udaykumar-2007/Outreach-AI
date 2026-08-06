@@ -1,7 +1,7 @@
 import { Router, Response, Request } from 'express';
 import { AuthenticatedRequest, requireAuth } from '../middleware/auth.js';
 import { getSupabaseUserClient, supabaseAdmin } from '../services/supabase.js';
-import { portfolioQueue } from '../services/queues.js';
+import { portfolioQueue, autopostQueue } from '../services/queues.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -196,6 +196,68 @@ router.get('/my/config', requireAuth, async (req: AuthenticatedRequest, res: Res
   } catch (err: any) {
     console.error('My portfolio GET error:', err);
     return res.status(500).json({ error: 'Server error loading portfolio' });
+  }
+});
+
+// POST /api/portfolio/autopost (authenticated) - trigger AI blog posting to Dev.to and Twitter
+router.post('/autopost', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = req.user!;
+    const userClient = getSupabaseUserClient(req.token!);
+
+    // Check if the user has a portfolio generated
+    const { data: portfolio, error: portfolioError } = await userClient
+      .from('portfolios')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (portfolioError || !portfolio) {
+      return res.status(404).json({ error: 'No portfolio found. Please generate your web portfolio first.' });
+    }
+
+    // Check if the user has configured keys for Dev.to or Twitter
+    const { data: profile, error: profileError } = await userClient
+      .from('profiles')
+      .select('api_keys')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found.' });
+    }
+
+    const keys = profile.api_keys || {};
+    const hasTwitter = !!(keys.twitter_api_key && keys.twitter_api_secret && keys.twitter_access_token && keys.twitter_access_secret);
+    const hasDevto = !!keys.devto_api_key;
+
+    if (!hasTwitter && !hasDevto) {
+      return res.status(400).json({ error: 'Please configure at least your Dev.to API key or Twitter API credentials in Settings first.' });
+    }
+
+    // Trigger background autopost worker job
+    const job = await autopostQueue.add(
+      `autopost-${user.id}`,
+      {
+        userId: user.id,
+        portfolioSlug: portfolio.slug,
+        hasTwitter,
+        hasDevto,
+      },
+      {
+        removeOnComplete: true,
+      }
+    );
+
+    console.log(`[Autopost] Enqueued autopost job ${job.id} for user ${user.id}`);
+
+    return res.json({
+      message: 'Autopost worker triggered. Your technical portfolio announcement will be drafted and published shortly.',
+      jobId: job.id,
+    });
+  } catch (err: any) {
+    console.error('Portfolio autopost route error:', err);
+    return res.status(500).json({ error: 'Server error triggering autopost' });
   }
 });
 
