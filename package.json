@@ -1,0 +1,13 @@
+{
+  "name": "outreach-ai-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix workers && npm install --prefix client",
+    "dev": "concurrently --kill-others \"npm run dev --prefix server\" \"npm run dev --prefix workers\" \"npm run dev --prefix client\"",
+    "build:all": "npm run build --prefix server && npm run build --prefix workers && npm run build --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
