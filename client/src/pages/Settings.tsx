@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore.js';
 import { useFilterStore } from '../store/filterStore.js';
 import { motion } from 'framer-motion';
+import { API_BASE_URL } from '../config.js';
 import { 
   Save, 
   User, 
@@ -75,7 +76,7 @@ export const Settings: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch('http://localhost:5000/api/campaigns', {
+      const res = await fetch(`${API_BASE_URL}/api/campaigns`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (res.ok) {
@@ -139,7 +140,7 @@ export const Settings: React.FC = () => {
         if (activeDevto) activePlatforms.push('devto');
 
         for (const plat of activePlatforms) {
-          await fetch('http://localhost:5000/api/campaigns', {
+          await fetch(`${API_BASE_URL}/api/campaigns`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

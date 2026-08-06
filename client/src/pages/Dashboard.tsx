@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore.js';
 import { useFilterStore } from '../store/filterStore.js';
 import { useSocketStore } from '../store/socketStore.js';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../config.js';
 import { 
   LineChart, 
   Line, 
@@ -73,7 +74,7 @@ export const Dashboard: React.FC = () => {
         setLoading(false);
         return;
       }
-      const res = await fetch('http://localhost:5000/api/analytics', {
+      const res = await fetch(`${API_BASE_URL}/api/analytics`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (res.ok) {
@@ -159,14 +160,14 @@ export const Dashboard: React.FC = () => {
 
       if (session && !session.access_token.startsWith('mock_jwt')) {
         try {
-          const campRes = await fetch('http://localhost:5000/api/campaigns', {
+          const campRes = await fetch(`${API_BASE_URL}/api/campaigns`, {
             headers: { Authorization: `Bearer ${session.access_token}` }
           });
           const campaigns = await campRes.json();
           let targetCampaign = campaigns[0];
 
           if (!targetCampaign) {
-            const createRes = await fetch('http://localhost:5000/api/campaigns', {
+            const createRes = await fetch(`${API_BASE_URL}/api/campaigns`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
@@ -181,7 +182,7 @@ export const Dashboard: React.FC = () => {
             });
             targetCampaign = await createRes.json();
           } else {
-            await fetch(`http://localhost:5000/api/campaigns/${targetCampaign.id}`, {
+            await fetch(`${API_BASE_URL}/api/campaigns/${targetCampaign.id}`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
@@ -265,7 +266,7 @@ export const Dashboard: React.FC = () => {
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">Autonomous Core / V1.0</span>
           </div>
           <h2 className="text-3xl font-black tracking-tight leading-none gold-header">
-            Welcome back, {profile?.full_name || 'Operator'}
+            Welcome back, {profile?.full_name || 'User'}
           </h2>
           <p className="text-xs text-slate-400 max-w-xl leading-relaxed font-medium">
             Your personal AI Operating System is actively monitoring freelance channels and student developer internship vacancies.

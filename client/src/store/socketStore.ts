@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
+import { API_BASE_URL } from '../config.js';
 
 interface LogItem {
   id: string;
@@ -36,7 +37,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     }
 
     try {
-      const socket = io('http://localhost:5000', {
+      const socket = io(API_BASE_URL, {
         auth: { token },
         reconnectionAttempts: 5,
         reconnectionDelay: 3000,

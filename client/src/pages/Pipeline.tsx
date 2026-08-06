@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore.js';
 import { useFilterStore } from '../store/filterStore.js';
 import { useSocketStore } from '../store/socketStore.js';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../config.js';
 import { 
   ChevronRight, 
   ChevronLeft,
@@ -40,7 +41,7 @@ export const Pipeline: React.FC = () => {
     if (!session) return;
     try {
       const p = platform !== 'all' ? `platform=${platform}` : '';
-      const url = `http://localhost:5000/api/leads?${p}`;
+      const url = `${API_BASE_URL}/api/leads?${p}`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
@@ -109,7 +110,7 @@ export const Pipeline: React.FC = () => {
 
     if (!session) return;
     try {
-      await fetch(`http://localhost:5000/api/leads/${leadId}`, {
+      await fetch(`${API_BASE_URL}/api/leads/${leadId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

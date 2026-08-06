@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore.js';
 import { useFilterStore } from '../store/filterStore.js';
 import { useSocketStore } from '../store/socketStore.js';
+import { API_BASE_URL } from '../config.js';
 import { 
   MessageSquare, 
   Send, 
@@ -46,7 +47,7 @@ export const Inbox: React.FC = () => {
     if (!session) return;
     try {
       const p = globalPlatform !== 'all' ? `platform=${globalPlatform}&` : '';
-      const url = `http://localhost:5000/api/leads?${p}status=interested`;
+      const url = `${API_BASE_URL}/api/leads?${p}status=interested`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
@@ -79,7 +80,7 @@ export const Inbox: React.FC = () => {
       if (!selectedLead || !session) return;
       setLoadingMessages(true);
       try {
-        const res = await fetch(`http://localhost:5000/api/leads/${selectedLead.id}/messages`, {
+        const res = await fetch(`${API_BASE_URL}/api/leads/${selectedLead.id}/messages`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (res.ok) {
@@ -119,7 +120,7 @@ export const Inbox: React.FC = () => {
     const contentToSend = replyText;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/leads/${selectedLead.id}/messages`, {
+      const res = await fetch(`${API_BASE_URL}/api/leads/${selectedLead.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,16 +152,17 @@ export const Inbox: React.FC = () => {
   };
 
   const getQuickReplies = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
     if (profile?.role === 'student') {
       return [
         "Thank you! I'd love to connect. Are you free for a 15-min call next week?",
-        "I appreciate the response. Here is a link to view my work samples: http://localhost:3000/portfolio",
+        `I appreciate the response. Here is a link to view my work samples: ${origin}/portfolio`,
         "Thanks for reaching out! What specific skills or profiles are you sourcing for?",
       ];
     } else {
       return [
         "Thanks for your interest! Let's schedule a call to review your scope. How does Thursday look?",
-        "Glad to connect! You can inspect my previous projects here: http://localhost:3000/portfolio",
+        `Glad to connect! You can inspect my previous projects here: ${origin}/portfolio`,
         "Thanks! I am available to start next week. Let me know if you'd like to sign a retainer contract.",
       ];
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, Component, ReactNode, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, ArrowRight, BookOpen, Layers, Monitor, Star, FastForward } from 'lucide-react';
+import { Sparkles, ArrowRight, BookOpen, Layers, Monitor, Star } from 'lucide-react';
 
 // Lazy load R3F 3D Canvas Scene
 const Hero3DCanvas = lazy(() => import('../components/Hero3DCanvas.js'));
@@ -112,7 +112,6 @@ export const Landing: React.FC = () => {
     }
   });
 
-  const [canSkip, setCanSkip] = useState(false);
   const [cursorPos, setCursorPos] = useState({ x: -100, y: -100 });
   const [cursorHover, setCursorHover] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
@@ -125,28 +124,8 @@ export const Landing: React.FC = () => {
     { name: 'Elena Rostova', role: 'Dev.to Blogger', text: 'Auto-posting portfolio updates is seamless. The champagne UI elements are gorgeous.', rating: 5 }
   ];
 
+  // Mouse move and scroll handling (Active on Home page ONLY)
   useEffect(() => {
-    if (introStep === 3) return;
-
-    let t1: any, t2: any, t3: any;
-
-    try {
-      t1 = setTimeout(() => setIntroStep(1), 400); // 0.4s: Golden light & particle assembly
-      t2 = setTimeout(() => {
-        setIntroStep(2);
-        setCanSkip(true); // 1.5s: Enable "SKIP INTRO" button
-      }, 1500);
-      t3 = setTimeout(() => {
-        try {
-          sessionStorage.setItem('hasSeenCinematicIntro', 'true');
-        } catch (e) {}
-        setIntroStep(3); // 3.2s: Dissolve into Hero layout
-      }, 3200);
-    } catch (err) {
-      console.warn('Intro animation timer warning, skipping to Hero:', err);
-      setIntroStep(3);
-    }
-
     const handleMouseMove = (e: MouseEvent) => {
       setCursorPos({ x: e.clientX, y: e.clientY });
     };
@@ -164,25 +143,38 @@ export const Landing: React.FC = () => {
     window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      if (t1) clearTimeout(t1);
-      if (t2) clearTimeout(t2);
-      if (t3) clearTimeout(t3);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [introStep]);
+  }, []);
 
-  const skipIntro = () => {
+  // Cinematic Intro Sequence (Automatically finishes after 3 seconds)
+  useEffect(() => {
+    let t1: any, t2: any;
+
     try {
-      sessionStorage.setItem('hasSeenCinematicIntro', 'true');
-    } catch (e) {}
-    setIntroStep(3);
-  };
+      t1 = setTimeout(() => setIntroStep(1), 300); // 0.3s: Golden light assembly
+      t2 = setTimeout(() => {
+        try {
+          sessionStorage.setItem('hasSeenCinematicIntro', 'true');
+        } catch (e) {}
+        setIntroStep(3); // 3.0s: Dissolve overlay and reveal Home page
+      }, 3000);
+    } catch (err) {
+      console.warn('Intro animation timer warning, skipping to Hero:', err);
+      setIntroStep(3);
+    }
+
+    return () => {
+      if (t1) clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-[#0B0F14] text-white selection:bg-[#EACEAA]/20 selection:text-[#EACEAA] overflow-x-hidden">
       
-      {/* Custom Cursor */}
+      {/* Custom Cursor (Home Page Only) */}
       <div 
         className={`hidden md:block fixed w-8 h-8 rounded-full border border-[#EACEAA]/40 pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-100 ease-out ${
           cursorHover ? 'scale-[2.2] bg-[#EACEAA]/5 border-[#EACEAA]' : ''
@@ -221,22 +213,9 @@ export const Landing: React.FC = () => {
 
                 <div className="text-center space-y-1">
                   <h3 className="font-mono text-xs text-[#EACEAA] tracking-[0.25em] uppercase font-bold">BOOTSTRAPPING AI OS</h3>
-                  <span className="text-[10px] text-slate-500 font-mono font-bold uppercase tracking-wider block">OUTREACH AI / V1.0</span>
+                  <span className="text-[10px] text-[#EACEAA]/60 font-mono font-bold uppercase tracking-wider block">OUTREACH AI / V1.0</span>
                 </div>
               </motion.div>
-            )}
-
-            {/* Skip Intro Trigger Button */}
-            {canSkip && (
-              <motion.button
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                onClick={skipIntro}
-                className="absolute bottom-8 right-8 z-20 px-4 py-2 rounded-full border border-[#EACEAA]/30 bg-[#EACEAA]/10 hover:bg-[#EACEAA] text-[#EACEAA] hover:text-[#0B0F14] text-[10px] font-mono font-black uppercase tracking-widest flex items-center gap-1.5 transition-all"
-              >
-                <span>SKIP INTRO</span>
-                <FastForward className="w-3 h-3" />
-              </motion.button>
             )}
           </motion.div>
         )}

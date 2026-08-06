@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore.js';
 import { motion } from 'framer-motion';
+import { API_BASE_URL } from '../config.js';
 import { 
   Sparkles, 
   Plus, 
@@ -44,7 +45,7 @@ export const Portfolio: React.FC = () => {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/portfolio/my/config', {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/my/config`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (res.ok) {
@@ -102,7 +103,7 @@ export const Portfolio: React.FC = () => {
     setGenerating(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/portfolio/generate', {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,14 +122,14 @@ export const Portfolio: React.FC = () => {
         setHtmlCode(data.html_content);
         setCssCode(data.css_content);
       } else {
-        const fallbackSlug = (profile?.full_name || 'operator').toLowerCase().replace(/\s+/g, '-');
+        const fallbackSlug = (profile?.full_name || 'user').toLowerCase().replace(/\s+/g, '-');
         setSlug(fallbackSlug);
         setIsPublished(true);
         setHtmlCode(getFallbackHtml(profile, samples));
         setCssCode(getFallbackCss());
       }
     } catch (err) {
-      const fallbackSlug = (profile?.full_name || 'operator').toLowerCase().replace(/\s+/g, '-');
+      const fallbackSlug = (profile?.full_name || 'user').toLowerCase().replace(/\s+/g, '-');
       setSlug(fallbackSlug);
       setIsPublished(true);
       setHtmlCode(getFallbackHtml(profile, samples));
@@ -143,7 +144,7 @@ export const Portfolio: React.FC = () => {
     setAutoposting(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/portfolio/devto-autopost', {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/devto-autopost`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -398,7 +399,7 @@ export const Portfolio: React.FC = () => {
 
 function getFallbackHtml(profile: any, samples: WorkSample[]) {
   return `<div class="portfolio-container">
-  <h1>${profile?.full_name || 'Operator'}</h1>
+  <h1>${profile?.full_name || 'User'}</h1>
   <p>${profile?.role === 'freelancer' ? 'Software Integration Engineer' : 'Computer Science Student'}</p>
   <div class="samples">
     ${samples.map((s) => `<div class="sample-card"><h3>${s.title}</h3><p>${s.description}</p></div>`).join('\n    ')}

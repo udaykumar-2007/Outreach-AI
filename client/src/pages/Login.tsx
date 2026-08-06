@@ -87,7 +87,7 @@ export const Login: React.FC = () => {
             <span className="font-mono font-black text-base text-[#0B0F14]">OA</span>
           </div>
           <h1 className="text-2xl font-black tracking-tight gold-header">
-            {isRegistering ? 'Create Operator Account' : 'Welcome to Outreach AI'}
+            {isRegistering ? 'Create Account' : 'Welcome to Outreach AI'}
           </h1>
           <p className="text-xs text-slate-400 font-medium">
             {isRegistering 
@@ -220,7 +220,7 @@ export const Login: React.FC = () => {
             type="submit"
             className="w-full btn-hud-primary py-3 rounded-xl text-xs uppercase tracking-widest font-black transition-all shadow-lg shadow-amber-500/10 mt-2"
           >
-            {isRegistering ? 'Register Account' : 'Authenticate Operator'}
+            {isRegistering ? 'Register Account' : 'Sign In'}
           </button>
         </form>
 
