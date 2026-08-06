@@ -25,8 +25,8 @@ import {
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const { session, profile } = useAuthStore();
-  const { persona, platform } = useFilterStore();
+  const { session } = useAuthStore();
+  const { persona } = useFilterStore();
   const { logs, isConnected, addLog } = useSocketStore();
 
   const [automationRunning, setAutomationRunning] = useState(false);

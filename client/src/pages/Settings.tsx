@@ -5,14 +5,13 @@ import {
   Save, 
   User, 
   Settings2, 
-  Zap, 
   AlertCircle,
   CheckCircle,
-  HelpCircle
+  Loader2
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const { session, profile, updateProfile, fetchProfile } = useAuthStore();
+  const { session, profile, updateProfile } = useAuthStore();
   const { setPersona } = useFilterStore();
 
   // Profile forms

@@ -3,13 +3,9 @@ import { useAuthStore } from '../store/authStore.js';
 import { useFilterStore } from '../store/filterStore.js';
 import { useSocketStore } from '../store/socketStore.js';
 import { 
-  ArrowLeftRight, 
   ChevronRight, 
   ChevronLeft,
-  ExternalLink, 
-  Star,
-  Layers,
-  Inbox
+  ExternalLink
 } from 'lucide-react';
 
 interface Lead {
@@ -99,7 +95,7 @@ export const Pipeline: React.FC = () => {
       try {
         // Find lead details first to get matching endpoints, or update leads database directly using supabase client!
         // Yes, supabase user client runs RLS policies. Wait, Express doesn't have a direct lead PATCH status, but we can write a simple PATCH endpoint or just call database updates. Wait, in the server routes we did not implement an explicit PATCH lead status route, but we can call supabase directly from frontend or update via Express. Wait! Calling database update directly using client-side Supabase client is the canonical Supabase way!
-        const { useAuthStore } = await import('../store/authStore.js');
+        // Auth store already imported
         const { supabase } = await import('../store/authStore.js');
         if (supabase) {
           await supabase

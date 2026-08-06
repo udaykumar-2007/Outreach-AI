@@ -7,8 +7,7 @@ import {
   GitMerge, 
   Globe, 
   Settings, 
-  LogOut,
-  UserCheck2
+  LogOut
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {

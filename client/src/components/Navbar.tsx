@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useFilterStore } from '../store/filterStore.js';
 import { useAuthStore } from '../store/authStore.js';
-import { Layers, HelpCircle } from 'lucide-react';
+
 
 export const Navbar: React.FC = () => {
   const { persona, setPersona, platform, setPlatform } = useFilterStore();

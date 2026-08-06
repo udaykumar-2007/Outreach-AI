@@ -5,7 +5,7 @@ import {
   Sparkles, 
   Plus, 
   Trash, 
-  Globe, 
+
   Eye, 
   Loader2, 
   ExternalLink,
@@ -21,7 +21,7 @@ interface WorkSample {
 }
 
 export const Portfolio: React.FC = () => {
-  const { session, profile, fetchProfile, updateProfile } = useAuthStore();
+  const { session, profile, updateProfile } = useAuthStore();
   const { socket } = useSocketStore();
 
   const [samples, setSamples] = useState<WorkSample[]>([]);
