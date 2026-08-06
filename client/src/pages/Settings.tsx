@@ -206,12 +206,12 @@ export const Settings: React.FC = () => {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Full Name</label>
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">User Name</label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Alex Rivera"
+                  placeholder="Enter your username"
                   className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200"
                   required
                 />

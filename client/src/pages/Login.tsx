@@ -118,14 +118,14 @@ export const Login: React.FC = () => {
           {isRegistering && (
             <>
               <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Full Name</label>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">User Name</label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                   <input
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Alex Rivera"
+                    placeholder="Enter your username"
                     className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-600"
                     required
                   />
