@@ -70,7 +70,9 @@ export const Sidebar: React.FC = () => {
             {profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
           </div>
           <div className="overflow-hidden flex-1">
-            <h4 className="font-bold text-xs text-slate-200 truncate">{profile?.full_name || 'Active User'}</h4>
+            <h4 className="font-bold text-xs text-slate-200 truncate">
+              {profile?.full_name || user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : 'Active User')}
+            </h4>
             <p className="text-[9px] text-slate-500 truncate mt-0.5 font-mono">{user?.email}</p>
           </div>
           <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 font-mono ${

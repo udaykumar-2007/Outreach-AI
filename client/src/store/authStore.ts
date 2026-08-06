@@ -70,21 +70,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Check localStorage for mock session
       const savedUser = localStorage.getItem('outreach_mock_user');
       const savedProfile = localStorage.getItem('outreach_mock_profile');
-      if (savedUser && savedProfile) {
-        const user = JSON.parse(savedUser);
-        const profile = JSON.parse(savedProfile);
-        set({
-          user,
-          profile,
-          session: {
-            access_token: generateMockToken(user.id),
-            token_type: 'bearer',
-            expires_in: 3600,
-            refresh_token: 'mock_refresh',
-            user: user as any,
-          } as any,
-        });
+      let user = savedUser ? JSON.parse(savedUser) : null;
+      let profile = savedProfile ? JSON.parse(savedProfile) : null;
+
+      if (!user || !profile) {
+        user = user || {
+          id: 'mock-user-uuid-12345678',
+          email: 'developer@domain.com',
+          user_metadata: { full_name: 'Jane Developer', role: 'freelancer' },
+        };
+        profile = profile || {
+          id: user.id,
+          full_name: user.user_metadata?.full_name || 'Jane Developer',
+          role: user.user_metadata?.role || 'freelancer',
+          bio: 'Fullstack developer specializing in AI orchestration and automation.',
+          skills: ['React', 'TypeScript', 'Node.js', 'Playwright', 'Gemini'],
+          work_samples: [
+            { title: 'Portfolio Generator', description: 'Scaffolds web pages dynamically.', technologies: ['TypeScript', 'Gemini'] },
+            { title: 'Crawler Service', description: 'Headless browser crawler built with Playwright.', technologies: ['Node.js', 'Playwright'] },
+          ],
+          is_busy: false,
+          active_platforms: { linkedin: true, twitter: true, upwork: true },
+        };
+        localStorage.setItem('outreach_mock_user', JSON.stringify(user));
+        localStorage.setItem('outreach_mock_profile', JSON.stringify(profile));
       }
+
+      set({
+        user,
+        profile,
+        session: {
+          access_token: generateMockToken(user.id),
+          token_type: 'bearer',
+          expires_in: 3600,
+          refresh_token: 'mock_refresh',
+          user: user as any,
+        } as any,
+      });
       set({ isLoading: false });
       return;
     }
@@ -275,12 +297,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
 
     if (isMockMode) {
-      const currentProfile = get().profile;
-      if (currentProfile) {
-        const updated = { ...currentProfile, ...profileData };
-        localStorage.setItem('outreach_mock_profile', JSON.stringify(updated));
-        set({ profile: updated, isLoading: false });
+      const currentProfile = get().profile || {
+        id: get().user?.id || 'mock-user-uuid-12345678',
+        full_name: 'Jane Developer',
+        role: 'freelancer',
+        bio: 'Fullstack developer specializing in AI orchestration and automation.',
+        skills: ['React', 'TypeScript', 'Node.js', 'Playwright', 'Gemini'],
+        work_samples: [],
+        is_busy: false,
+        active_platforms: { linkedin: true, twitter: true, upwork: true },
+      };
+      
+      const updatedProfile = { ...currentProfile, ...profileData };
+      const currentUser = get().user;
+      let updatedUser = currentUser;
+
+      if (currentUser) {
+        updatedUser = {
+          ...currentUser,
+          user_metadata: {
+            ...currentUser.user_metadata,
+            full_name: updatedProfile.full_name,
+            role: updatedProfile.role,
+          },
+        };
+        localStorage.setItem('outreach_mock_user', JSON.stringify(updatedUser));
       }
+
+      localStorage.setItem('outreach_mock_profile', JSON.stringify(updatedProfile));
+      set({ profile: updatedProfile as any, user: updatedUser as any, isLoading: false });
       return true;
     }
 
@@ -296,7 +341,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (response.ok) {
         const profile = await response.json();
-        set({ profile, isLoading: false });
+        const currentUser = get().user;
+        let updatedUser = currentUser;
+        if (currentUser && profile.full_name) {
+          updatedUser = {
+            ...currentUser,
+            user_metadata: {
+              ...currentUser.user_metadata,
+              full_name: profile.full_name,
+              role: profile.role,
+            },
+          };
+        }
+        set({ profile, user: updatedUser, isLoading: false });
         return true;
       }
       set({ isLoading: false });

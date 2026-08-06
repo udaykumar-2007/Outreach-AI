@@ -48,7 +48,7 @@ const AnimatedCounter: React.FC<{ value: number; suffix?: string }> = ({ value, 
 };
 
 export const Dashboard: React.FC = () => {
-  const { session, profile } = useAuthStore();
+  const { session, profile, user } = useAuthStore();
   const { persona } = useFilterStore();
   const { logs, isConnected, addLog } = useSocketStore();
 
@@ -266,7 +266,7 @@ export const Dashboard: React.FC = () => {
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">Autonomous Core / V1.0</span>
           </div>
           <h2 className="text-3xl font-black tracking-tight leading-none gold-header">
-            Welcome back, {profile?.full_name || 'User'}
+            Welcome back, {profile?.full_name || user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : 'User')}
           </h2>
           <p className="text-xs text-slate-400 max-w-xl leading-relaxed font-medium">
             Your personal AI Operating System is actively monitoring freelance channels and student developer internship vacancies.

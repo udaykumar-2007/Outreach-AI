@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import { getSupabaseUserClient } from '../services/supabase.js';
+import { getSupabaseUserClient, supabaseAdmin } from '../services/supabase.js';
 import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
@@ -42,40 +42,40 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
     const user = req.user!;
     const userClient = getSupabaseUserClient(req.token!);
 
-    const { data: profile, error } = await userClient
+    let { data: profile, error } = await userClient
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
-    if (error) {
-      // If profile not found, let's create a default profile row
-      if (error.code === 'PGRST116') {
-        const defaultProfile = {
-          id: user.id,
-          full_name: user.user_metadata?.full_name || '',
-          role: user.user_metadata?.role || 'student',
-          bio: '',
-          skills: [],
-          work_samples: [],
-          is_busy: false,
-          active_platforms: { linkedin: true, twitter: true, upwork: true },
-        };
+    if (error || !profile) {
+      const adminRes = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      profile = adminRes.data;
+    }
 
-        const { data: newProfile, error: insertError } = await userClient
-          .from('profiles')
-          .insert(defaultProfile)
-          .select('*')
-          .single();
+    if (!profile) {
+      const defaultProfile = {
+        id: user.id,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        role: user.user_metadata?.role || 'student',
+        bio: '',
+        skills: [],
+        work_samples: [],
+        is_busy: false,
+        active_platforms: { linkedin: true, twitter: true, upwork: true },
+      };
 
-        if (insertError) {
-          console.error('Error creating profile fallback:', insertError);
-          return res.status(500).json({ error: 'Failed to initialize profile' });
-        }
-        return res.json(newProfile);
-      }
-      console.error('Error fetching profile:', error);
-      return res.status(500).json({ error: 'Failed to retrieve profile' });
+      const { data: newProfile } = await supabaseAdmin
+        .from('profiles')
+        .upsert(defaultProfile)
+        .select('*')
+        .single();
+
+      return res.json(newProfile || defaultProfile);
     }
 
     return res.json(profile);
@@ -123,14 +123,25 @@ router.put('/', async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    const { data: updatedProfile, error } = await userClient
+    let { data: updatedProfile, error } = await userClient
       .from('profiles')
-      .update(parseResult.data)
-      .eq('id', user.id)
+      .upsert({ id: user.id, ...parseResult.data })
       .select('*')
       .single();
 
-    if (error) {
+    if (error || !updatedProfile) {
+      console.warn('[ProfileRouter] userClient upsert warning, trying admin client:', error?.message);
+      const adminRes = await supabaseAdmin
+        .from('profiles')
+        .upsert({ id: user.id, ...parseResult.data })
+        .select('*')
+        .single();
+      
+      updatedProfile = adminRes.data;
+      error = adminRes.error;
+    }
+
+    if (error || !updatedProfile) {
       console.error('Error updating profile:', error);
       return res.status(500).json({ error: 'Failed to update profile' });
     }
