@@ -340,24 +340,6 @@ export const Settings: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:opacity-95 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10 transition-all duration-200"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Saving Configurations...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                <span>Save All Settings</span>
-              </>
-            )}
-          </button>
-
         </div>
 
         {/* Integrations & API Keys Panel */}
@@ -444,6 +426,27 @@ export const Settings: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Global Save Button at the bottom */}
+        <div className="col-span-1 lg:col-span-2 pt-4">
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:opacity-95 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10 transition-all duration-200"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Saving Configurations...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                <span>Save All Settings</span>
+              </>
+            )}
+          </button>
         </div>
 
       </form>
