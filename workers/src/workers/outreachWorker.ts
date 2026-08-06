@@ -31,6 +31,60 @@ export const outreachWorker = new Worker<OutreachJobData>(
       return;
     }
 
+    // 1. API Credentials validation check
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('api_keys')
+      .eq('id', userId)
+      .single();
+
+    if (profileErr || !profile) {
+      console.error(`[OutreachWorker] Profile error for user ${userId}:`, profileErr);
+      await publishLog(userId, 'WARNING', { message: 'Failed to retrieve user keys for outreach.' });
+      return;
+    }
+
+    const keys = profile.api_keys || {};
+
+    if (platform === 'linkedin') {
+      const hasLiCookie = !!keys.linkedin_li_at;
+      if (!hasLiCookie) {
+        console.log(`[OutreachWorker] LinkedIn li_at cookie not configured for user ${userId}. Skipping outreach.`);
+        await publishLog(userId, 'WARNING', {
+          message: `LinkedIn outreach skipped. Please configure your LinkedIn li_at cookie in Settings first.`,
+        });
+        return;
+      }
+    } else if (platform === 'twitter') {
+      const hasTwitter = !!(keys.twitter_api_key && keys.twitter_api_secret && keys.twitter_access_token && keys.twitter_access_secret);
+      if (!hasTwitter) {
+        console.log(`[OutreachWorker] Twitter API credentials not configured for user ${userId}. Skipping outreach.`);
+        await publishLog(userId, 'WARNING', {
+          message: `Twitter/X outreach skipped. Please configure all Twitter API credentials in Settings first.`,
+        });
+        return;
+      }
+    }
+
+    // 2. Enforce 1 message per hour rate limit
+    const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+    const { data: recentMsgs, error: msgErr } = await supabaseAdmin
+      .from('messages')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('direction', 'sent')
+      .gt('created_at', oneHourAgo);
+
+    if (recentMsgs && recentMsgs.length > 0) {
+      console.log(`[OutreachWorker] Rate-limit hit: User ${userId} has already sent a message in the last hour. Delaying outreach.`);
+      await publishLog(userId, 'WARNING', {
+        message: `Outreach rate-limited (1 message/hour). Postponing message to ${lead.name} to comply with limits.`,
+      });
+      // Re-enqueue the job with a 15-minute delay to try again later
+      await job.changeDelay(15 * 60 * 1000); // 15 minutes delay
+      throw new Error('Rate limit of 1 message per hour exceeded. Job postponed.');
+    }
+
     const { context, page, browser, statePath } = await getBrowserSession(userId, platform);
 
     try {

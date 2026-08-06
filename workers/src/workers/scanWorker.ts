@@ -33,6 +33,49 @@ export const scanWorker = new Worker<ScanJobData>(
       return;
     }
 
+    // Check if user has configured the necessary API Keys/cookies for this platform
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('api_keys')
+      .eq('id', userId)
+      .single();
+
+    if (profileErr || !profile) {
+      console.error(`[ScanWorker] Profile error for user ${userId}:`, profileErr);
+      await publishLog(userId, 'WARNING', { message: 'Failed to retrieve user keys for campaign automation.' });
+      return;
+    }
+
+    const keys = profile.api_keys || {};
+
+    if (platform === 'linkedin') {
+      const hasLiCookie = !!keys.linkedin_li_at;
+      if (!hasLiCookie) {
+        console.log(`[ScanWorker] LinkedIn li_at cookie not configured for user ${userId}. Pausing campaign.`);
+        await supabaseAdmin
+          .from('campaigns')
+          .update({ active: false })
+          .eq('id', campaignId);
+        await publishLog(userId, 'WARNING', {
+          message: `LinkedIn campaign paused. Please configure your LinkedIn li_at cookie in Settings first.`,
+        });
+        return;
+      }
+    } else if (platform === 'twitter') {
+      const hasTwitter = !!(keys.twitter_api_key && keys.twitter_api_secret && keys.twitter_access_token && keys.twitter_access_secret);
+      if (!hasTwitter) {
+        console.log(`[ScanWorker] Twitter API credentials not configured for user ${userId}. Pausing campaign.`);
+        await supabaseAdmin
+          .from('campaigns')
+          .update({ active: false })
+          .eq('id', campaignId);
+        await publishLog(userId, 'WARNING', {
+          message: `Twitter/X campaign paused. Please configure all Twitter API credentials in Settings first.`,
+        });
+        return;
+      }
+    }
+
     const { context, page, browser, statePath } = await getBrowserSession(userId, platform);
 
     try {
