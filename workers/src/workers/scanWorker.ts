@@ -18,6 +18,7 @@ export const scanWorker = new Worker<ScanJobData>(
   'scan-queue',
   async (job: Job<ScanJobData>) => {
     const { campaignId, userId, platform, targetKeywords, targetRole } = job.data;
+    const plat: string = platform;
     console.log(`[ScanWorker] Executing scan job ${job.id} for campaign ${campaignId} (${platform})`);
 
     // Check if campaign is still active
@@ -48,7 +49,7 @@ export const scanWorker = new Worker<ScanJobData>(
 
     const keys = profile.api_keys || {};
 
-    if (platform === 'linkedin') {
+    if (plat === 'linkedin') {
       const hasLiCookie = !!keys.linkedin_li_at;
       if (!hasLiCookie) {
         console.log(`[ScanWorker] LinkedIn li_at cookie not configured for user ${userId}. Pausing campaign.`);
@@ -61,7 +62,7 @@ export const scanWorker = new Worker<ScanJobData>(
         });
         return;
       }
-    } else if (platform === 'twitter') {
+    } else if (plat === 'twitter') {
       const hasTwitter = !!(keys.twitter_api_key && keys.twitter_api_secret && keys.twitter_access_token && keys.twitter_access_secret);
       if (!hasTwitter) {
         console.log(`[ScanWorker] Twitter API credentials not configured for user ${userId}. Pausing campaign.`);
@@ -74,7 +75,7 @@ export const scanWorker = new Worker<ScanJobData>(
         });
         return;
       }
-    } else if (platform === 'devto') {
+    } else if (plat === 'devto') {
       const hasDevto = !!keys.devto_api_key;
       if (!hasDevto) {
         console.log(`[ScanWorker] Dev.to API Key not configured for user ${userId}. Pausing campaign.`);
@@ -87,6 +88,16 @@ export const scanWorker = new Worker<ScanJobData>(
         });
         return;
       }
+    } else if (plat === 'upwork') {
+      console.log(`[ScanWorker] Upwork credentials not configured for user ${userId}. Pausing campaign.`);
+      await supabaseAdmin
+        .from('campaigns')
+        .update({ active: false })
+        .eq('id', campaignId);
+      await publishLog(userId, 'WARNING', {
+        message: `Upwork campaign paused. Upwork credentials are not configured.`,
+      });
+      return;
     }
 
     const { context, page, browser, statePath } = await getBrowserSession(userId, platform);
@@ -96,13 +107,13 @@ export const scanWorker = new Worker<ScanJobData>(
       const keyword = targetKeywords[0] || targetRole;
       let searchUrl = '';
 
-      if (platform === 'linkedin') {
+      if (plat === 'linkedin') {
         searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keyword)}`;
-      } else if (platform === 'twitter') {
+      } else if (plat === 'twitter') {
         searchUrl = `https://x.com/search?q=${encodeURIComponent(keyword)}&f=user`;
-      } else if (platform === 'upwork') {
+      } else if (plat === 'upwork') {
         searchUrl = `https://www.upwork.com/nx/search/jobs/?q=${encodeURIComponent(keyword)}`;
-      } else if (platform === 'devto') {
+      } else if (plat === 'devto') {
         searchUrl = `https://dev.to/search?q=${encodeURIComponent(keyword)}`;
       }
 
@@ -115,7 +126,7 @@ export const scanWorker = new Worker<ScanJobData>(
       // Scrape lists based on selectors
       const discoveredLeads: Array<{ name: string; profileUrl: string; headline: string; company: string }> = [];
 
-      if (platform === 'linkedin') {
+      if (plat === 'linkedin') {
         const cards = page.locator('.linkedin-profile-card');
         const count = await cards.count();
         console.log(`[ScanWorker] Found ${count} profile cards on search page.`);
@@ -131,7 +142,7 @@ export const scanWorker = new Worker<ScanJobData>(
             company: headline.includes('at ') ? headline.split('at ')[1] : 'Unknown',
           });
         }
-      } else if (platform === 'twitter') {
+      } else if (plat === 'twitter') {
         const tweets = page.locator('.twitter-tweet');
         const count = await tweets.count();
         console.log(`[ScanWorker] Found ${count} tweets on search page.`);
@@ -148,7 +159,7 @@ export const scanWorker = new Worker<ScanJobData>(
             company: 'Twitter/X Post',
           });
         }
-      } else if (platform === 'upwork') {
+      } else if (plat === 'upwork') {
         const cards = page.locator('.upwork-job-card');
         const count = await cards.count();
         console.log(`[ScanWorker] Found ${count} jobs on search page.`);
@@ -164,7 +175,7 @@ export const scanWorker = new Worker<ScanJobData>(
             company: 'Upwork Project',
           });
         }
-      } else if (platform === 'devto') {
+      } else if (plat === 'devto') {
         const items = page.locator('.crayons-story__meta');
         const count = await items.count();
         console.log(`[ScanWorker] Found ${count} story metadata items on Dev.to search page.`);

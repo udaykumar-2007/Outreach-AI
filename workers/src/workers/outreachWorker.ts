@@ -17,6 +17,7 @@ export const outreachWorker = new Worker<OutreachJobData>(
   'outreach-queue',
   async (job: Job<OutreachJobData>) => {
     const { messageId, leadId, userId, platform, profileUrl, content } = job.data;
+    const plat: string = platform;
     console.log(`[OutreachWorker] Processing job ${job.id} - Sending to ${profileUrl}`);
 
     // Retrieve lead details
@@ -46,7 +47,7 @@ export const outreachWorker = new Worker<OutreachJobData>(
 
     const keys = profile.api_keys || {};
 
-    if (platform === 'linkedin') {
+    if (plat === 'linkedin') {
       const hasLiCookie = !!keys.linkedin_li_at;
       if (!hasLiCookie) {
         console.log(`[OutreachWorker] LinkedIn li_at cookie not configured for user ${userId}. Skipping outreach.`);
@@ -55,7 +56,7 @@ export const outreachWorker = new Worker<OutreachJobData>(
         });
         return;
       }
-    } else if (platform === 'twitter') {
+    } else if (plat === 'twitter') {
       const hasTwitter = !!(keys.twitter_api_key && keys.twitter_api_secret && keys.twitter_access_token && keys.twitter_access_secret);
       if (!hasTwitter) {
         console.log(`[OutreachWorker] Twitter API credentials not configured for user ${userId}. Skipping outreach.`);
@@ -64,7 +65,7 @@ export const outreachWorker = new Worker<OutreachJobData>(
         });
         return;
       }
-    } else if (platform === 'devto') {
+    } else if (plat === 'devto') {
       const hasDevto = !!keys.devto_api_key;
       if (!hasDevto) {
         console.log(`[OutreachWorker] Dev.to API Key not configured for user ${userId}. Skipping outreach.`);
@@ -73,6 +74,12 @@ export const outreachWorker = new Worker<OutreachJobData>(
         });
         return;
       }
+    } else if (plat === 'upwork') {
+      console.log(`[OutreachWorker] Upwork credentials not configured for user ${userId}. Skipping outreach.`);
+      await publishLog(userId, 'WARNING', {
+        message: `Upwork outreach skipped. Upwork credentials are not configured.`,
+      });
+      return;
     }
 
     // 2. Enforce 1 message per hour rate limit
@@ -99,13 +106,13 @@ export const outreachWorker = new Worker<OutreachJobData>(
     try {
       // Navigate to target message / profile page
       let targetUrl = profileUrl;
-      if (platform === 'linkedin') {
+      if (plat === 'linkedin') {
         const username = profileUrl.substring(profileUrl.lastIndexOf('/') + 1) || 'alex-rivera';
         targetUrl = `https://www.linkedin.com/messaging/thread/${username}`;
-      } else if (platform === 'twitter') {
+      } else if (plat === 'twitter') {
         const handle = profileUrl.substring(profileUrl.lastIndexOf('/') + 1) || 'elena_codes';
         targetUrl = `https://x.com/messages/${handle}`;
-      } else if (platform === 'devto') {
+      } else if (plat === 'devto') {
         targetUrl = profileUrl;
       }
 
@@ -137,7 +144,7 @@ export const outreachWorker = new Worker<OutreachJobData>(
       }
 
       // Input text and Send message
-      if (platform === 'linkedin') {
+      if (plat === 'linkedin') {
         // Find chat input. In mock it is #message-input, in production it uses standard aria-label
         const inputSelector = page.locator('#message-input, [role="textbox"][aria-label*="message"]').first();
         const sendSelector = page.locator('.send-btn, button[type="submit"]:has-text("Send")').first();
@@ -150,7 +157,7 @@ export const outreachWorker = new Worker<OutreachJobData>(
         } else {
           throw new Error('LinkedIn chat input field not found.');
         }
-      } else if (platform === 'twitter') {
+      } else if (plat === 'twitter') {
         // Simulating Twitter message send
         const inputSelector = page.locator('#message-input, [data-testid="dmComposerTextInput"]').first();
         const sendSelector = page.locator('.send-btn, [data-testid="dmComposerSendButton"]').first();
@@ -163,14 +170,14 @@ export const outreachWorker = new Worker<OutreachJobData>(
         } else {
           throw new Error('Twitter DM input field not found.');
         }
-      } else if (platform === 'upwork') {
+      } else if (plat === 'upwork') {
         // Simulating proposal submission
         const submitSelector = page.locator('.job-post-link, button:has-text("Submit Proposal")').first();
         if (await submitSelector.isVisible()) {
           await submitSelector.click();
           console.log('[OutreachWorker] Upwork proposal submission clicked.');
         }
-      } else if (platform === 'devto') {
+      } else if (plat === 'devto') {
         const inputSelector = page.locator('#message-input, .markdown-textarea, [aria-label="Comment body"]').first();
         const sendSelector = page.locator('.send-btn, button:has-text("Submit"), button:has-text("Publish")').first();
 

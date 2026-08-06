@@ -83,9 +83,9 @@ export const Dashboard: React.FC = () => {
       
       // Let's create an active interval that triggers mock logs every 3.5 seconds
       // to let the user see the visual socket feed running in front of them!
-      const mockNames = ['Alice Chen', 'Robert Taylor', 'Jordan Smith', 'Emma Watson', 'Liam Neeson'];
-      const mockProfiles = ['https://linkedin.com/in/alice', 'https://x.com/rob_codes', 'https://linkedin.com/in/jordan', 'https://upwork.com/freelancer/emma', 'https://x.com/neeson'];
-      const mockPlatforms = ['linkedin', 'twitter', 'linkedin', 'upwork', 'twitter'];
+      const mockNames = ['Alice Chen', 'Robert Taylor', 'Jordan Smith', 'Emma Watson', 'Liam Neeson', 'Rohan Sharma'];
+      const mockProfiles = ['https://linkedin.com/in/alice', 'https://x.com/rob_codes', 'https://linkedin.com/in/jordan', 'https://upwork.com/freelancer/emma', 'https://x.com/neeson', 'https://dev.to/rohan_codes'];
+      const mockPlatforms = ['linkedin', 'twitter', 'linkedin', 'upwork', 'twitter', 'devto'];
       let step = 0;
 
       const interval = setInterval(() => {
