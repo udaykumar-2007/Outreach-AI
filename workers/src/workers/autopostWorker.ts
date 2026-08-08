@@ -94,6 +94,18 @@ export const autopostWorker = new Worker<AutopostJobData>(
 
     const keys = profile.api_keys || {};
     const devtoApiKey = keys.devto_api_key;
+    const geminiKey = keys.gemini_api_key;
+
+    // Dynamically initialize the Gemini client
+    let localAi: GoogleGenAI | null = null;
+    const activeKey = (geminiKey && geminiKey !== 'your-google-gemini-api-key') ? geminiKey : process.env.GEMINI_API_KEY;
+    if (activeKey && activeKey !== 'your-google-gemini-api-key' && activeKey !== 'your-gemini-key') {
+      try {
+        localAi = new GoogleGenAI({ apiKey: activeKey });
+      } catch (err) {
+        console.error('[AutopostWorker] Failed to initialize local Gemini client:', err);
+      }
+    }
 
     const portfolioUrl = `http://localhost:3000/portfolio/${portfolioSlug}`;
 
@@ -142,9 +154,9 @@ I would love to connect and hear your feedback!
       tweet_content: fallbackTweet,
     };
 
-    if (ai) {
+    if (localAi) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await localAi.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: prompt,
           config: {

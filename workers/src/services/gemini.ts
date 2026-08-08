@@ -18,6 +18,19 @@ if (apiKey && apiKey !== 'your-google-gemini-api-key') {
   console.warn('Warning: GEMINI_API_KEY is not set. Using local simulation responses for AI operations.');
 }
 
+// Helper to resolve the correct Gemini client dynamically
+export function getGoogleGenAI(userApiKey?: string | null): GoogleGenAI | null {
+  const activeKey = userApiKey || process.env.GEMINI_API_KEY;
+  if (activeKey && activeKey !== 'your-google-gemini-api-key' && activeKey !== 'your-gemini-key') {
+    try {
+      return new GoogleGenAI({ apiKey: activeKey });
+    } catch (err) {
+      console.error('Failed to initialize dynamic GoogleGenAI client:', err);
+    }
+  }
+  return ai;
+}
+
 // Zod schemas for validation
 export const leadScoringSchema = z.object({
   is_match: z.boolean(),
@@ -38,15 +51,21 @@ export type MessageDraftResult = z.infer<typeof messageDraftSchema>;
 export type SentimentResult = z.infer<typeof sentimentSchema>;
 
 // Helper to run gemini-2.5-flash with structured JSON output
-async function generateStructuredJSON<T>(prompt: string, schema: z.ZodSchema<T>, fallback: T): Promise<T> {
-  if (!ai) {
+async function generateStructuredJSON<T>(
+  prompt: string,
+  schema: z.ZodSchema<T>,
+  fallback: T,
+  userApiKey?: string | null
+): Promise<T> {
+  const client = getGoogleGenAI(userApiKey);
+  if (!client) {
     // Return mock fallback in simulation/local-dev mode
     console.log('[AI Simulation] Gemini key not provided, utilizing simulated response.');
     return fallback;
   }
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -71,7 +90,8 @@ async function generateStructuredJSON<T>(prompt: string, schema: z.ZodSchema<T>,
 export async function scoreLead(
   profileText: string,
   targetRole: string,
-  targetKeywords: string[]
+  targetKeywords: string[],
+  userApiKey?: string | null
 ): Promise<LeadScoringResult> {
   const keywordsStr = targetKeywords.join(', ');
   const prompt = `
@@ -108,7 +128,7 @@ export async function scoreLead(
     reason: `Simulated Match: Found ${matches} keywords in the scraped profile.`,
   };
 
-  return generateStructuredJSON(prompt, leadScoringSchema, mockFallback);
+  return generateStructuredJSON(prompt, leadScoringSchema, mockFallback, userApiKey);
 }
 
 // 2. Draft Outreach Message
@@ -119,7 +139,8 @@ export async function draftOutreachMessage(
   platform: string,
   persona: 'student' | 'freelancer',
   skills: string[],
-  workSamples: any[]
+  workSamples: any[],
+  userApiKey?: string | null
 ): Promise<MessageDraftResult> {
   const limit = platform.toLowerCase() === 'linkedin' ? 280 : platform.toLowerCase() === 'twitter' ? 250 : 800;
   
@@ -161,11 +182,15 @@ export async function draftOutreachMessage(
     draft_message: fallbackMessage.slice(0, limit),
   };
 
-  return generateStructuredJSON(prompt, messageDraftSchema, mockFallback);
+  return generateStructuredJSON(prompt, messageDraftSchema, mockFallback, userApiKey);
 }
 
 // 3. Draft Busy Buffer Apology
-export async function draftBusyBufferMessage(leadName: string, leadContent: string): Promise<MessageDraftResult> {
+export async function draftBusyBufferMessage(
+  leadName: string,
+  leadContent: string,
+  userApiKey?: string | null
+): Promise<MessageDraftResult> {
   const prompt = `
     You are a busy freelancer. A potential client named ${leadName} reached out saying:
     "${leadContent}"
@@ -184,11 +209,14 @@ export async function draftBusyBufferMessage(leadName: string, leadContent: stri
     draft_message: `Hi ${leadName}, thank you for reaching out! I'm currently wrapping up a major project deliverable for a client. I would love to discuss this with you—would you be free to jump on a brief call in about two days once my schedule clears up?`,
   };
 
-  return generateStructuredJSON(prompt, messageDraftSchema, mockFallback);
+  return generateStructuredJSON(prompt, messageDraftSchema, mockFallback, userApiKey);
 }
 
 // 4. Classify Reply Sentiment
-export async function classifySentiment(receivedMessage: string): Promise<SentimentResult> {
+export async function classifySentiment(
+  receivedMessage: string,
+  userApiKey?: string | null
+): Promise<SentimentResult> {
   const prompt = `
     Analyze the sentiment of this received message from a networking pitch.
     Message: "${receivedMessage}"
@@ -214,5 +242,5 @@ export async function classifySentiment(receivedMessage: string): Promise<Sentim
   }
   const mockFallback: SentimentResult = { sentiment };
 
-  return generateStructuredJSON(prompt, sentimentSchema, mockFallback);
+  return generateStructuredJSON(prompt, sentimentSchema, mockFallback, userApiKey);
 }

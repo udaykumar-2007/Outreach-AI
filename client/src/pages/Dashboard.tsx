@@ -227,7 +227,7 @@ export const Dashboard: React.FC = () => {
     { title: 'TypeScript Core Contributor', company: 'OSS Fellowship', duration: '6 Months', match: '91%', tags: ['Node', 'TypeScript'] }
   ];
 
-  const handleSendChat = (e: React.FormEvent) => {
+  const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim()) return;
     
@@ -236,18 +236,30 @@ export const Dashboard: React.FC = () => {
     setUserInput('');
     setAiState('processing');
 
-    setTimeout(() => {
-      let reply = 'AI-OS response: ';
-      if (userMsg.toLowerCase().includes('portfolio') || userMsg.toLowerCase().includes('presence')) {
-        reply += 'Web portfolio compilation active. Custom styles can be compiled inside the Web Presence generator module.';
-      } else if (userMsg.toLowerCase().includes('key') || userMsg.toLowerCase().includes('setting')) {
-        reply += 'API keys are stored securely using Supabase pgcrypto. You can configure active credentials inside Settings.';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/profile/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ message: userMsg, history: chatMessages.slice(-6) }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(prev => [...prev, { sender: 'ai', text: data.reply }]);
       } else {
-        reply += 'Crawler loops active. Playwright sessions are waiting to schedule the next batch.';
+        const data = await res.json().catch(() => ({}));
+        const errMsg = data.error || 'Failed to analyze request';
+        setChatMessages(prev => [...prev, { sender: 'ai', text: `Failed to compile strategist response: ${errMsg}` }]);
       }
-      setChatMessages(prev => [...prev, { sender: 'ai', text: reply }]);
+    } catch (err: any) {
+      console.error('Chat routing failure:', err);
+      setChatMessages(prev => [...prev, { sender: 'ai', text: `Network communication failure: ${err.message}` }]);
+    } finally {
       setAiState('idle');
-    }, 1200);
+    }
   };
 
   return (

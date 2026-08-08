@@ -259,7 +259,7 @@ export const scanWorker = new Worker<ScanJobData>(
         }
 
         // Score lead via Gemini
-        const scoreResult = await scoreLead(bioText, targetRole, targetKeywords);
+        const scoreResult = await scoreLead(bioText, targetRole, targetKeywords, keys.gemini_api_key);
         console.log(`[ScanWorker] Scored ${leadInfo.name}: Score=${scoreResult.score}, Match=${scoreResult.is_match}`);
 
         const updatedStatus = scoreResult.is_match ? 'evaluated' : 'rejected';
@@ -294,7 +294,7 @@ export const scanWorker = new Worker<ScanJobData>(
             
             // Check freelancer busy buffer mode
             if (profile.role === 'freelancer' && profile.is_busy) {
-              const draftObj = await draftBusyBufferMessage(leadInfo.name, bioText);
+              const draftObj = await draftBusyBufferMessage(leadInfo.name, bioText, keys.gemini_api_key);
               draft = draftObj.draft_message;
             } else {
               const draftObj = await draftOutreachMessage(
@@ -304,7 +304,8 @@ export const scanWorker = new Worker<ScanJobData>(
                 platform,
                 profile.role,
                 profile.skills || [],
-                profile.work_samples || []
+                profile.work_samples || [],
+                keys.gemini_api_key
               );
               draft = draftObj.draft_message;
             }

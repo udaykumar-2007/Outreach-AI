@@ -30,6 +30,17 @@ export const Settings: React.FC = () => {
   const [twitterAccessToken, setTwitterAccessToken] = useState('');
   const [twitterAccessSecret, setTwitterAccessSecret] = useState('');
   const [devtoApiKey, setDevtoApiKey] = useState('');
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+
+  // API Connection statuses
+  const [geminiConnStatus, setGeminiConnStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [geminiConnError, setGeminiConnError] = useState<string | null>(null);
+  const [devtoConnStatus, setDevtoConnStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [devtoConnError, setDevtoConnError] = useState<string | null>(null);
+  const [linkedinConnStatus, setLinkedinConnStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [linkedinConnError, setLinkedinConnError] = useState<string | null>(null);
+  const [twitterConnStatus, setTwitterConnStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [twitterConnError, setTwitterConnError] = useState<string | null>(null);
 
   // Campaign configurations
   const [targetRole, setTargetRole] = useState('');
@@ -65,6 +76,7 @@ export const Settings: React.FC = () => {
       setTwitterAccessToken(keys.twitter_access_token || '');
       setTwitterAccessSecret(keys.twitter_access_secret || '');
       setDevtoApiKey(keys.devto_api_key || '');
+      setGeminiApiKey(keys.gemini_api_key || '');
     }
     loadCampaignSettings();
   }, [profile]);
@@ -120,6 +132,7 @@ export const Settings: React.FC = () => {
         twitter_access_token: twitterAccessToken || null,
         twitter_access_secret: twitterAccessSecret || null,
         devto_api_key: devtoApiKey || null,
+        gemini_api_key: geminiApiKey || null,
       },
     } as any);
 
@@ -163,6 +176,85 @@ export const Settings: React.FC = () => {
     setSaving(false);
     
     setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const testConnection = async (
+    platform: 'gemini' | 'devto' | 'linkedin' | 'twitter',
+    keyVal?: string,
+    additionalKeys?: any
+  ) => {
+    if (platform === 'gemini') { setGeminiConnStatus('loading'); setGeminiConnError(null); }
+    if (platform === 'devto') { setDevtoConnStatus('loading'); setDevtoConnError(null); }
+    if (platform === 'linkedin') { setLinkedinConnStatus('loading'); setLinkedinConnError(null); }
+    if (platform === 'twitter') { setTwitterConnStatus('loading'); setTwitterConnError(null); }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/profile/verify-key`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          platform,
+          key: keyVal,
+          additionalKeys,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (platform === 'gemini') setGeminiConnStatus('success');
+        if (platform === 'devto') setDevtoConnStatus('success');
+        if (platform === 'linkedin') setLinkedinConnStatus('success');
+        if (platform === 'twitter') setTwitterConnStatus('success');
+      } else {
+        const error = data.error || 'Connection failed';
+        if (platform === 'gemini') { setGeminiConnStatus('error'); setGeminiConnError(error); }
+        if (platform === 'devto') { setDevtoConnStatus('error'); setDevtoConnError(error); }
+        if (platform === 'linkedin') { setLinkedinConnStatus('error'); setLinkedinConnError(error); }
+        if (platform === 'twitter') { setTwitterConnStatus('error'); setTwitterConnError(error); }
+      }
+    } catch (err: any) {
+      const error = err.message || 'Network error';
+      if (platform === 'gemini') { setGeminiConnStatus('error'); setGeminiConnError(error); }
+      if (platform === 'devto') { setDevtoConnStatus('error'); setDevtoConnError(error); }
+      if (platform === 'linkedin') { setLinkedinConnStatus('error'); setLinkedinConnError(error); }
+      if (platform === 'twitter') { setTwitterConnStatus('error'); setTwitterConnError(error); }
+    }
+  };
+
+  const renderConnectButton = (
+    status: 'idle' | 'loading' | 'success' | 'error',
+    errorMsg: string | null,
+    onClick: () => void
+  ) => {
+    return (
+      <div className="flex flex-col gap-1 shrink-0 justify-end">
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={status === 'loading'}
+          className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-300 flex items-center gap-1.5 min-w-[90px] justify-center ${
+            status === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : status === 'error'
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+          }`}
+        >
+          {status === 'loading' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {status === 'success' && <CheckCircle className="w-3.5 h-3.5" />}
+          {status === 'error' && <AlertCircle className="w-3.5 h-3.5" />}
+          {status === 'loading' ? 'Testing' : status === 'success' ? 'Connected' : status === 'error' ? 'Failed' : 'Connect'}
+        </button>
+        {status === 'error' && errorMsg && (
+          <span className="text-[8px] text-rose-400 font-medium max-w-[110px] truncate block" title={errorMsg}>
+            {errorMsg}
+          </span>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -339,31 +431,54 @@ export const Settings: React.FC = () => {
             <h3 className="font-extrabold text-xs text-white uppercase tracking-wider font-mono">API Keys & Integrations</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="space-y-4">
-              <div>
-                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Dev.to API Key</label>
-                <input
-                  type="password"
-                  value={devtoApiKey}
-                  onChange={(e) => setDevtoApiKey(e.target.value)}
-                  placeholder="Enter your Dev.to Developer API Key"
-                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
-                />
-                <p className="text-[9px] text-slate-500 mt-1 font-medium">Used to automatically publish technical portfolio announcement articles.</p>
+              <div className="flex items-start gap-2">
+                <div className="flex-1">
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Google Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    placeholder="Enter your Gemini AI API Key"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                {renderConnectButton(geminiConnStatus, geminiConnError, () => testConnection('gemini', geminiApiKey))}
               </div>
+              <p className="text-[9px] text-slate-500 font-medium">Used for cognitive match scoring, web design, and drafting outreach.</p>
 
-              <div>
-                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">LinkedIn li_at Cookie</label>
-                <input
-                  type="password"
-                  value={linkedinLiAt}
-                  onChange={(e) => setLinkedinLiAt(e.target.value)}
-                  placeholder="AQEDAVtN0PUAKP..."
-                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
-                />
-                <p className="text-[9px] text-slate-500 mt-1 font-medium">Your active session cookie (`li_at`) to authenticate the Playwright background bot.</p>
+              <div className="flex items-start gap-2">
+                <div className="flex-1">
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Dev.to API Key</label>
+                  <input
+                    type="password"
+                    value={devtoApiKey}
+                    onChange={(e) => setDevtoApiKey(e.target.value)}
+                    placeholder="Enter your Dev.to API Key"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                {renderConnectButton(devtoConnStatus, devtoConnError, () => testConnection('devto', devtoApiKey))}
               </div>
+              <p className="text-[9px] text-slate-500 font-medium">Used to automatically publish technical portfolio announcement articles.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-2">
+                <div className="flex-1">
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">LinkedIn li_at Cookie</label>
+                  <input
+                    type="password"
+                    value={linkedinLiAt}
+                    onChange={(e) => setLinkedinLiAt(e.target.value)}
+                    placeholder="AQEDAVtN0PUAKP..."
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                {renderConnectButton(linkedinConnStatus, linkedinConnError, () => testConnection('linkedin', linkedinLiAt))}
+              </div>
+              <p className="text-[9px] text-slate-500 font-medium">Your active session cookie (`li_at`) to authenticate the background Playwright browser.</p>
             </div>
 
             <div className="space-y-4">
@@ -411,6 +526,16 @@ export const Settings: React.FC = () => {
                     className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 pt-2">
+                <span className="text-[9px] text-slate-500 font-medium">Verify credentials</span>
+                {renderConnectButton(twitterConnStatus, twitterConnError, () => testConnection('twitter', undefined, {
+                  apiKey: twitterApiKey,
+                  apiSecret: twitterApiSecret,
+                  accessToken: twitterAccessToken,
+                  accessSecret: twitterAccessSecret
+                }))}
               </div>
             </div>
           </div>

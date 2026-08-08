@@ -44,6 +44,26 @@ export const portfolioWorker = new Worker<PortfolioJobData>(
     const { userId, fullName, role, bio, skills, workSamples } = job.data;
     console.log(`[PortfolioWorker] Generating portfolio for user ${userId} (${fullName})`);
 
+    // Fetch user profile keys for Gemini validation
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('api_keys')
+      .eq('id', userId)
+      .single();
+    const keys = profile?.api_keys || {};
+    const geminiKey = keys.gemini_api_key;
+
+    // Dynamically initialize the Gemini client
+    let localAi: GoogleGenAI | null = null;
+    const activeKey = (geminiKey && geminiKey !== 'your-google-gemini-api-key') ? geminiKey : process.env.GEMINI_API_KEY;
+    if (activeKey && activeKey !== 'your-google-gemini-api-key' && activeKey !== 'your-gemini-key') {
+      try {
+        localAi = new GoogleGenAI({ apiKey: activeKey });
+      } catch (err) {
+        console.error('[PortfolioWorker] Failed to initialize local Gemini client:', err);
+      }
+    }
+
     const prompt = `
       You are a master web designer. Build a stunning, professional, single-page web portfolio layout for:
       Name: ${fullName}
@@ -206,9 +226,9 @@ export const portfolioWorker = new Worker<PortfolioJobData>(
     let finalHtml = fallbackHtml;
     let finalCss = fallbackCss;
 
-    if (ai) {
+    if (localAi) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await localAi.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: prompt,
           config: {

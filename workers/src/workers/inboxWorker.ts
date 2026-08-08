@@ -35,6 +35,14 @@ export const inboxWorker = new Worker<InboxJobData>(
       return;
     }
 
+    // Fetch user profile keys for Gemini validation
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('api_keys')
+      .eq('id', userId)
+      .single();
+    const keys = profile?.api_keys || {};
+
     const { context, page, browser, statePath } = await getBrowserSession(userId, platform);
 
     try {
@@ -119,7 +127,7 @@ export const inboxWorker = new Worker<InboxJobData>(
         });
 
         // B. Grade Sentiment with Gemini
-        const sentimentResult = await classifySentiment(messageText);
+        const sentimentResult = await classifySentiment(messageText, keys.gemini_api_key);
         console.log(`[InboxWorker] Classified sentiment for ${lead.name}: ${sentimentResult.sentiment}`);
 
         // Update message sentiment
